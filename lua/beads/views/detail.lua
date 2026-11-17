@@ -100,8 +100,82 @@ local function apply(buf, bead)
   end
 end
 
+-- Fetches the current server version of the bead; cb(bead|nil, err).
+function M.fetch(buf, cb)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  local id = bead_id(buf)
+  local prev = cli.get_root_override()
+  cli.set_root(M.root(buf))
+  cli.show(id, function(res)
+    if res.err then
+      return cb(nil, res.err)
+    end
+    local item = type(res.data) == "table" and (res.data[1] or res.data) or nil
+    if not item or not item.id then
+      return cb(nil, "bead not found: " .. id)
+    end
+    cb(model.normalize(item))
+  end, { include_comments = true })
+  cli.set_root(prev)
+end
+
+-- Opens a split with the server rendering of the bead and diffs it against the detail buffer.
+function M.show_diff(buf, server)
+  local win = vim.fn.bufwinid(buf)
+  if win == -1 then
+    vim.api.nvim_set_current_buf(buf)
+    win = vim.api.nvim_get_current_win()
+  end
+  vim.api.nvim_set_current_win(win)
+  vim.cmd("diffthis")
+  vim.cmd("rightbelow vsplit")
+  local sbuf = vim.api.nvim_create_buf(false, true)
+  vim.bo[sbuf].buftype = "nofile"
+  vim.bo[sbuf].bufhidden = "wipe"
+  vim.bo[sbuf].filetype = "markdown"
+  vim.api.nvim_buf_set_lines(sbuf, 0, -1, false, (render.render(server)))
+  vim.bo[sbuf].modifiable = false
+  vim.api.nvim_win_set_buf(0, sbuf)
+  vim.cmd("diffthis")
+end
+
+local function warn_changed(buf)
+  if #vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true, type = "virt_lines" }) > 0 then
+    return
+  end
+  vim.api.nvim_buf_set_extmark(buf, ns, 0, 0, {
+    virt_lines = { { { "Beads: changed externally; :w will offer reload / force / diff", "WarningMsg" } } },
+    virt_lines_above = true,
+  })
+end
+
+local function subscribe(buf)
+  local id = bead_id(buf)
+  local unsub
+  unsub = require("beads.store").subscribe(state[buf].root, function(st)
+    if not vim.api.nvim_buf_is_valid(buf) or not state[buf] then
+      return
+    end
+    local cur, seen = st.by_id[id], state[buf].bead
+    if not cur or not seen or cur.updated_at == seen.updated_at then
+      return
+    end
+    if vim.bo[buf].modified then
+      warn_changed(buf)
+    else
+      M.load(buf)
+    end
+  end)
+  vim.api.nvim_create_autocmd("BufWipeout", { buffer = buf, once = true, callback = unsub })
+end
+
 -- (Re)loads the buffer from bd; safe to call from BufReadCmd or after a write.
 function M.load(buf)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
   local id = bead_id(buf)
   state[buf] = state[buf] or { root = cli.get_root() }
   if not vim.b[buf].beads_detail_init then
@@ -111,6 +185,7 @@ function M.load(buf)
     vim.bo[buf].bufhidden = "hide"
     vim.bo[buf].filetype = "markdown"
     setup_keys(buf)
+    subscribe(buf)
     vim.api.nvim_create_autocmd("BufWipeout", {
       buffer = buf,
       once = true,

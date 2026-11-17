@@ -8,10 +8,12 @@ local M = {}
 local function finish(detail, buf, root)
   store.mark_self_write(root)
   store.refresh(root)
-  detail.load(buf)
+  if vim.api.nvim_buf_is_valid(buf) then
+    detail.load(buf)
+  end
 end
 
-function M.write(buf)
+local function do_write(buf)
   local detail = require("beads.views.detail")
   local bead = detail.snapshot(buf)
   if not bead then
@@ -58,6 +60,40 @@ function M.write(buf)
   else
     run_deps(false)
   end
+end
+
+-- Re-fetches the bead first; a changed updated_at refuses the write and offers reload / force / diff.
+function M.write(buf)
+  local detail = require("beads.views.detail")
+  local seen = detail.snapshot(buf)
+  if not seen then
+    return do_write(buf)
+  end
+  detail.fetch(buf, function(server, err)
+    if not vim.api.nvim_buf_is_valid(buf) then
+      return
+    end
+    if err then
+      vim.notify("Beads: cannot check for external changes: " .. err, vim.log.levels.ERROR)
+      return
+    end
+    if server.updated_at == seen.updated_at then
+      return do_write(buf)
+    end
+    local choices = { "Reload (discard my edits)", "Force (apply my edits)", "Diff (compare with server)" }
+    vim.ui.select(choices, { prompt = "Beads: bead changed externally" }, function(choice)
+      if not vim.api.nvim_buf_is_valid(buf) then
+        return
+      end
+      if choice == choices[1] then
+        detail.load(buf)
+      elseif choice == choices[2] then
+        do_write(buf)
+      elseif choice == choices[3] then
+        detail.show_diff(buf, server)
+      end
+    end)
+  end)
 end
 
 return M
