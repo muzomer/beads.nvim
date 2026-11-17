@@ -6,6 +6,11 @@ function M.get_root()
   return root or vim.fn.getcwd()
 end
 
+-- Raw override (nil when unset), for save/restore.
+function M.get_root_override()
+  return root
+end
+
 function M.set_root(path)
   root = path
 end
