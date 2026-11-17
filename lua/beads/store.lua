@@ -109,6 +109,10 @@ function M.refresh(root, cb)
   start(root, e, cbs)
 end
 
+function M.is_refreshing(root)
+  return entry(root).in_flight
+end
+
 -- Marks that the plugin itself just wrote to root; a watcher-triggered refresh
 -- within the window can then be skipped via consume_self_write.
 function M.mark_self_write(root)
