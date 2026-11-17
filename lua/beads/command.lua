@@ -17,6 +17,15 @@ function M.run(args)
     require("beads.cli").set_root(vim.fn.fnamemodify(vim.fn.expand(path), ":p"))
     return
   end
+  if sub == "show" then
+    local id = args[2]
+    if not id or id == "" then
+      vim.notify("Usage: :Beads show <id>", vim.log.levels.INFO)
+      return
+    end
+    vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
+    return
+  end
   vim.notify("Beads " .. sub .. ": not implemented yet", vim.log.levels.WARN)
 end
 

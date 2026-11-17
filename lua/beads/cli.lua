@@ -66,8 +66,35 @@ function M.list(opts, cb)
   run(args, true, cb)
 end
 
-function M.show(id, cb)
-  run({ "show", id, "--json" }, true, cb)
+-- opts.include_comments adds --include-comments.
+function M.show(id, cb, opts)
+  local args = { "show", id, "--json" }
+  if opts and opts.include_comments then
+    args[#args + 1] = "--include-comments"
+  end
+  run(args, true, cb)
+end
+
+function M.claim(id, cb)
+  run({ "update", id, "--claim", "--json" }, true, cb)
+end
+
+function M.close(id, reason, cb)
+  local args = { "close", id }
+  if reason and reason ~= "" then
+    vim.list_extend(args, { "--reason", reason })
+  end
+  args[#args + 1] = "--json"
+  run(args, true, cb)
+end
+
+-- lines: bd batch grammar lines, passed via a temp file.
+function M.batch(lines, cb)
+  local path = vim.fn.tempname()
+  vim.fn.writefile(lines, path)
+  run({ "batch", "-f", path }, false, cb, function()
+    vim.fn.delete(path)
+  end)
 end
 
 function M.ready(cb)

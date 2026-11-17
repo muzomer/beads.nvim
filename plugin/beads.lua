@@ -20,3 +20,19 @@ end, {
     end, SUBCOMMANDS)
   end,
 })
+
+local group = vim.api.nvim_create_augroup("BeadsDetail", { clear = true })
+vim.api.nvim_create_autocmd("BufReadCmd", {
+  group = group,
+  pattern = "beads://*",
+  callback = function(args)
+    require("beads.views.detail").load(args.buf)
+  end,
+})
+vim.api.nvim_create_autocmd("BufWriteCmd", {
+  group = group,
+  pattern = "beads://*",
+  callback = function(args)
+    require("beads.buffer.write").write(args.buf)
+  end,
+})
