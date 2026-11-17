@@ -34,6 +34,11 @@ function M.run(args)
     require("beads.views.detail").open_new()
     return
   end
+  if vim.tbl_contains(require("beads.views.picker").sources, sub) then
+    local query = #args > 1 and table.concat(vim.list_slice(args, 2), " ") or nil
+    require("beads.views.picker").open(sub, query)
+    return
+  end
   vim.notify("Beads " .. sub .. ": not implemented yet", vim.log.levels.WARN)
 end
 
