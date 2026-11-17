@@ -2,12 +2,7 @@ local M = {}
 
 M.defaults = {
   tree = { width = 50 },
-  keys = {
-    open = "<CR>",
-    close = "q",
-    refresh = "R",
-    toggle = "<Tab>",
-  },
+  keys = require("beads.keys").default_map(), -- keys.<view>.<action> = lhs|false
   fzf = "auto",
 }
 

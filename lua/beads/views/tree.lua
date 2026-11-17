@@ -2,24 +2,11 @@
 local cli = require("beads.cli")
 local store = require("beads.store")
 local workflow = require("beads.workflow")
+local keys = require("beads.keys")
 
 local M = {}
 
 local views = {} -- tabpage -> { win, buf, root, show_closed, ids, unsub, release }
-
-local HELP = {
-  "<CR>  open bead in the previous window",
-  "a     add child bead",
-  "x     close bead (prompts for a reason)",
-  "C     claim bead",
-  "R     refresh",
-  "H     toggle closed beads",
-  "za/zo/zc  fold",
-  "yy    yank bead id",
-  "yr    yank workflow run command",
-  "q     close tree",
-  "g?    show this help",
-}
 
 local function sorted(list)
   table.sort(list, function(a, b)
@@ -139,8 +126,9 @@ local function prev_win(v)
 end
 
 local function setup_keys(v, tab)
-  local function map(lhs, fn, desc)
-    vim.keymap.set("n", lhs, fn, { buffer = v.buf, nowait = true, silent = true, desc = "Beads tree: " .. desc })
+  local acts = {}
+  local function map(name, fn)
+    acts[name] = fn
   end
   local function cur()
     return v.ids[vim.api.nvim_win_get_cursor(0)[1]]
@@ -166,23 +154,23 @@ local function setup_keys(v, tab)
     store.mark_self_write(v.root)
     store.refresh(v.root)
   end
-  map("<CR>", with_id(function(id)
+  map("open", with_id(function(id)
     local pw = prev_win(v)
     if not pw then
       return
     end
     vim.api.nvim_set_current_win(pw)
     vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
-  end), "open")
-  map("a", with_id(function(id)
+  end))
+  map("add_child", with_id(function(id)
     local pw = prev_win(v)
     if not pw then
       return
     end
     vim.api.nvim_set_current_win(pw)
     require("beads.views.detail").create_child(id)
-  end), "add child")
-  map("x", with_id(function(id)
+  end))
+  map("close_bead", with_id(function(id)
     vim.ui.input({ prompt = "Close reason (optional): " }, function(reason)
       if reason ~= nil then
         in_root(function()
@@ -190,34 +178,32 @@ local function setup_keys(v, tab)
         end)
       end
     end)
-  end), "close bead")
-  map("C", with_id(function(id)
+  end))
+  map("claim", with_id(function(id)
     in_root(function()
       cli.claim(id, after)
     end)
-  end), "claim")
-  map("R", function()
+  end))
+  map("refresh", function()
     store.refresh(v.root)
-  end, "refresh")
-  map("H", function()
+  end)
+  map("toggle_closed", function()
     v.show_closed = not v.show_closed
     render(v)
-  end, "toggle closed")
-  map("yy", with_id(function(id)
+  end)
+  map("yank_id", with_id(function(id)
     vim.fn.setreg('"', id)
-  end), "yank id")
-  map("yr", with_id(function(id)
+  end))
+  map("yank_run", with_id(function(id)
     local b = store.get(v.root).by_id[id]
     if b then
       vim.fn.setreg('"', workflow.run_command(b))
     end
-  end), "yank run command")
-  map("q", function()
+  end))
+  map("close", function()
     close(tab)
-  end, "close")
-  map("g?", function()
-    vim.notify("Beads tree keys:\n" .. table.concat(HELP, "\n"), vim.log.levels.INFO)
-  end, "help")
+  end)
+  keys.bind(v.buf, "tree", acts)
 end
 
 local function open()

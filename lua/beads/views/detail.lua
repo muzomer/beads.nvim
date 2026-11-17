@@ -3,6 +3,7 @@ local cli = require("beads.cli")
 local model = require("beads.model")
 local render = require("beads.buffer.render")
 local workflow = require("beads.workflow")
+local keys = require("beads.keys")
 
 local M = {}
 
@@ -23,21 +24,11 @@ local function bead_id(buf)
   return (vim.api.nvim_buf_get_name(buf):gsub("^beads://", ""))
 end
 
-local HELP = {
-  "x   close bead (prompts for a reason)",
-  "C   claim bead",
-  "n   append a note (float; <C-s> or :w confirms)",
-  "c   add a comment (float; <C-s> or :w confirms)",
-  "yy  yank bead id",
-  "yr  yank workflow run command",
-  "g?  show this help",
-}
-
-local function map(buf, lhs, fn, desc)
-  vim.keymap.set("n", lhs, fn, { buffer = buf, nowait = true, silent = true, desc = "Beads: " .. desc })
-end
-
 local function setup_keys(buf)
+  local acts = {}
+  local function map(_, name, fn)
+    acts[name] = fn
+  end
   local function with_bead(fn)
     return function()
       local b = M.snapshot(buf)
@@ -58,7 +49,7 @@ local function setup_keys(buf)
       end
     end
   end
-  map(buf, "x", with_bead(function(b)
+  map(buf, "close_bead", with_bead(function(b)
     local root = M.root(buf)
     vim.ui.input({ prompt = "Close reason (optional): " }, function(reason)
       if reason == nil then
@@ -69,14 +60,14 @@ local function setup_keys(buf)
       cli.close(b.id, reason, after(root))
       cli.set_root(prev)
     end)
-  end), "close")
-  map(buf, "C", with_bead(function(b)
+  end))
+  map(buf, "claim", with_bead(function(b)
     local root = M.root(buf)
     local prev = cli.get_root_override()
     cli.set_root(root)
     cli.claim(b.id, after(root))
     cli.set_root(prev)
-  end), "claim")
+  end))
   local function text_float(title, send)
     return function()
       if vim.bo[buf].modified then
@@ -122,28 +113,28 @@ local function setup_keys(buf)
         cli.set_root(prev)
       end
       vim.api.nvim_create_autocmd("BufWriteCmd", { buffer = fbuf, callback = confirm })
-      local o = { buffer = fbuf, nowait = true, silent = true }
-      vim.keymap.set("n", "<C-s>", confirm, o)
+      local function o(desc)
+        return { buffer = fbuf, nowait = true, silent = true, desc = "Beads " .. title:lower() .. ": " .. desc }
+      end
+      vim.keymap.set("n", "<C-s>", confirm, o("confirm"))
       vim.keymap.set("i", "<C-s>", function()
         vim.cmd("stopinsert")
         confirm()
-      end, o)
-      vim.keymap.set("n", "q", close, o)
-      vim.keymap.set("n", "<Esc>", close, o)
+      end, o("confirm"))
+      vim.keymap.set("n", "q", close, o("cancel"))
+      vim.keymap.set("n", "<Esc>", close, o("cancel"))
       vim.cmd("startinsert")
     end
   end
-  map(buf, "n", text_float("Note", cli.append_note), "append note")
-  map(buf, "c", text_float("Comment", cli.comment), "add comment")
-  map(buf, "yy", with_bead(function(b)
+  map(buf, "note", text_float("Note", cli.append_note))
+  map(buf, "comment", text_float("Comment", cli.comment))
+  map(buf, "yank_id", with_bead(function(b)
     vim.fn.setreg('"', b.id)
-  end), "yank id")
-  map(buf, "yr", with_bead(function(b)
+  end))
+  map(buf, "yank_run", with_bead(function(b)
     vim.fn.setreg('"', workflow.run_command(b))
-  end), "yank run command")
-  map(buf, "g?", function()
-    vim.notify("Beads detail keys:\n" .. table.concat(HELP, "\n"), vim.log.levels.INFO)
-  end, "help")
+  end))
+  keys.bind(buf, "detail", acts)
 end
 
 local function apply(buf, bead)
