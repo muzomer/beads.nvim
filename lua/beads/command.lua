@@ -8,6 +8,15 @@ function M.run(args)
     vim.notify("Usage: :Beads <" .. table.concat(M.subcommands, "|") .. ">", vim.log.levels.INFO)
     return
   end
+  if sub == "cd" then
+    local path = args[2]
+    if not path or path == "" then
+      vim.notify("Beads root: " .. require("beads.cli").get_root(), vim.log.levels.INFO)
+      return
+    end
+    require("beads.cli").set_root(vim.fn.fnamemodify(vim.fn.expand(path), ":p"))
+    return
+  end
   vim.notify("Beads " .. sub .. ": not implemented yet", vim.log.levels.WARN)
 end
 
