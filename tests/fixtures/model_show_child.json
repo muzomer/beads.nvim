@@ -1,0 +1,65 @@
+[
+  {
+    "id": "fx-cfa.1",
+    "title": "Child task",
+    "description": "desc text",
+    "design": "design text",
+    "acceptance_criteria": "ac text",
+    "notes": "some notes",
+    "status": "open",
+    "priority": 0,
+    "issue_type": "feature",
+    "assignee": "bob",
+    "owner": "tester@example.com",
+    "created_at": "2026-11-17T16:01:12Z",
+    "created_by": "Test User",
+    "updated_at": "2026-11-17T16:01:13Z",
+    "metadata": {
+      "owner_note": "hello",
+      "review_round": 2
+    },
+    "labels": [
+      "alpha",
+      "beta"
+    ],
+    "dependencies": [
+      {
+        "id": "fx-cfa",
+        "title": "Epic one",
+        "status": "open",
+        "priority": 1,
+        "issue_type": "epic",
+        "owner": "tester@example.com",
+        "created_at": "2026-11-17T16:01:11Z",
+        "created_by": "Test User",
+        "updated_at": "2026-11-17T16:01:11Z",
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "fx-80s",
+        "title": "Blocker task",
+        "status": "open",
+        "priority": 2,
+        "issue_type": "task",
+        "owner": "tester@example.com",
+        "created_at": "2026-11-17T16:01:11Z",
+        "created_by": "Test User",
+        "updated_at": "2026-11-17T16:01:11Z",
+        "dependency_type": "blocks"
+      }
+    ],
+    "comments": [
+      {
+        "id": "01a1ea3d-adf8-7b73-89d0-ef19c4fec02f",
+        "issue_id": "fx-cfa.1",
+        "author": "Test User",
+        "text": "first comment",
+        "created_at": "2026-11-17T16:01:13Z"
+      }
+    ],
+    "parent": "fx-cfa",
+    "dependent_count": 0,
+    "dependency_count": 2,
+    "comment_count": 1
+  }
+]

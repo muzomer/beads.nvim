@@ -1,0 +1,92 @@
+[
+  {
+    "id": "fx-cfa.1",
+    "title": "Child task",
+    "description": "desc text",
+    "design": "design text",
+    "acceptance_criteria": "ac text",
+    "notes": "some notes",
+    "status": "open",
+    "priority": 0,
+    "issue_type": "feature",
+    "assignee": "bob",
+    "owner": "tester@example.com",
+    "created_at": "2026-11-17T16:01:12Z",
+    "created_by": "Test User",
+    "updated_at": "2026-11-17T16:01:13Z",
+    "metadata": {
+      "owner_note": "hello",
+      "review_round": 2
+    },
+    "labels": [
+      "alpha",
+      "beta"
+    ],
+    "dependencies": [
+      {
+        "issue_id": "fx-cfa.1",
+        "depends_on_id": "fx-cfa",
+        "type": "parent-child",
+        "created_at": "2026-11-17T17:01:11Z",
+        "created_by": "Test User",
+        "metadata": "{}"
+      },
+      {
+        "issue_id": "fx-cfa.1",
+        "depends_on_id": "fx-80s",
+        "type": "blocks",
+        "created_at": "2026-11-17T17:01:12Z",
+        "created_by": "Test User",
+        "metadata": "{}"
+      }
+    ],
+    "dependency_count": 1,
+    "dependent_count": 0,
+    "comment_count": 1,
+    "parent": "fx-cfa"
+  },
+  {
+    "id": "fx-cfa",
+    "title": "Epic one",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "epic",
+    "owner": "tester@example.com",
+    "created_at": "2026-11-17T16:01:11Z",
+    "created_by": "Test User",
+    "updated_at": "2026-11-17T16:01:11Z",
+    "dependency_count": 0,
+    "dependent_count": 0,
+    "comment_count": 0
+  },
+  {
+    "id": "fx-80s",
+    "title": "Blocker task",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "task",
+    "owner": "tester@example.com",
+    "created_at": "2026-11-17T16:01:11Z",
+    "created_by": "Test User",
+    "updated_at": "2026-11-17T16:01:11Z",
+    "dependency_count": 0,
+    "dependent_count": 1,
+    "comment_count": 0
+  },
+  {
+    "id": "fx-17x",
+    "title": "Done task",
+    "status": "closed",
+    "priority": 3,
+    "issue_type": "bug",
+    "owner": "tester@example.com",
+    "created_at": "2026-11-17T16:01:14Z",
+    "created_by": "Test User",
+    "updated_at": "2026-11-17T16:01:14Z",
+    "closed_at": "2026-11-17T16:01:14Z",
+    "close_reason": "Closed",
+    "dependency_count": 0,
+    "dependent_count": 0,
+    "comment_count": 0
+  }
+]
