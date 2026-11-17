@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "beads_nvim",
+  "project_id": "afd32b79-f606-461f-9e79-cf77e006c9bf"
+}
