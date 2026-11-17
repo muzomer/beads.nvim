@@ -1,0 +1,96 @@
+-- Bead beads_nvim-4gx.8: overriding / disabling detail.view, detail.edit and input keys.
+-- Interface under test (config names pinned here; values are a key, a list of keys, or false):
+--   keymaps.detail.view.claim  (default "C")          keymaps.detail.view.note (default "n")
+--   keymaps.detail.view.edit   (default { "e", "i" })
+--   keymaps.detail.edit.save   (default "<C-s>", normal + insert)
+--   keymaps.detail.edit.view   (default "<Esc><Esc>", normal: back to view)
+--   keymaps.input.submit       (default "<C-s>", normal + insert)
+--   keymaps.input.submit_normal(default "<CR>", normal only)
+--   keymaps.input.cancel       (default { "q", "<Esc>" }, normal)
+-- Overrides change the buffer-local maps and the ?/g? help float.
+-- bd is a fake on PATH (tests/modes_fake.lua).
+
+local fake = require("tests.modes_fake")
+
+describe("beads keymap overrides (detail, input)", function()
+  before_each(function()
+    fake.setup()
+  end)
+
+  after_each(function()
+    fake.teardown()
+    require("beads").setup({})
+  end)
+
+  it("detail.view: override, list value and false change the maps", function()
+    require("beads").setup({ keymaps = { detail = { view = { claim = "<F6>", edit = { "E" }, note = false } } } })
+    local buf = fake.open_detail()
+    local km = fake.buf_map(buf, "n", "<F6>")
+    assert.is_not_nil(km, "<F6> not mapped")
+    assert.is_truthy(km.desc and km.desc:lower():find("claim"), "desc of <F6> does not mention claim")
+    assert.is_nil(fake.buf_map(buf, "n", "C"), "default C still mapped")
+    assert.is_nil(fake.buf_map(buf, "n", "n"), "n still mapped with note = false")
+    assert.is_nil(fake.buf_map(buf, "n", "e"), "e still mapped with edit = { 'E' }")
+    assert.is_nil(fake.buf_map(buf, "n", "i"), "i still mapped with edit = { 'E' }")
+    assert.is_not_nil(fake.buf_map(buf, "n", "c"), "other view keys were lost")
+    fake.press("E")
+    assert.is_true(fake.is_edit(buf), "E did not switch to edit mode")
+  end)
+
+  it("detail.view: the help float lists the overridden key", function()
+    require("beads").setup({ keymaps = { detail = { view = { claim = "<F6>" } } } })
+    fake.open_detail()
+    local f = fake.press_for_float("g?")
+    assert.is_not_nil(f, "g? opened no float")
+    local text = fake.float_text(f)
+    fake.close_float(f)
+    local hit = false
+    for _, l in ipairs(vim.split(text, "\n")) do
+      if l:find("<F6>", 1, true) and l:lower():find("claim", 1, true) then
+        hit = true
+      end
+      assert.is_nil(l:find("%f[%w]C%f[%W]"), "help still lists default key C:\n" .. text)
+    end
+    assert.is_true(hit, "help has no line with <F6> and claim:\n" .. text)
+  end)
+
+  it("detail.edit: override and false change the maps and the help float", function()
+    require("beads").setup({ keymaps = { detail = { edit = { save = "<C-g>", view = false } } } })
+    local buf = fake.open_detail()
+    fake.press("e")
+    pcall(vim.cmd, "stopinsert")
+    assert.is_true(fake.is_edit(buf), "e did not switch to edit mode")
+    assert.is_not_nil(fake.buf_map(buf, "n", "<C-g>"), "<C-g> not mapped (normal)")
+    assert.is_not_nil(fake.buf_map(buf, "i", "<C-g>"), "<C-g> not mapped (insert)")
+    assert.is_nil(fake.buf_map(buf, "n", "<C-s>"), "default <C-s> still mapped (normal)")
+    assert.is_nil(fake.buf_map(buf, "i", "<C-s>"), "default <C-s> still mapped (insert)")
+    assert.is_nil(fake.buf_map(buf, "n", "<Esc><Esc>"), "<Esc><Esc> still mapped with view = false")
+    local f = fake.press_for_float("g?")
+    assert.is_not_nil(f, "g? opened no float in edit mode")
+    local text = fake.float_text(f)
+    fake.close_float(f)
+    assert.is_truthy(text:find("<C-g>", 1, true), "edit help does not list <C-g>:\n" .. text)
+    assert.is_nil(text:find("<C-s>", 1, true), "edit help still lists <C-s>:\n" .. text)
+  end)
+
+  it("input: override and false change the float maps", function()
+    require("beads").setup({ keymaps = { input = { submit = "<C-g>", submit_normal = false, cancel = "Q" } } })
+    fake.open_detail()
+    local f = fake.press_for_float("n")
+    assert.is_not_nil(f, "n opened no float")
+    local fbuf = vim.api.nvim_win_get_buf(f)
+    assert.is_not_nil(fake.buf_map(fbuf, "n", "<C-g>"), "<C-g> not mapped (normal)")
+    assert.is_not_nil(fake.buf_map(fbuf, "i", "<C-g>"), "<C-g> not mapped (insert)")
+    assert.is_nil(fake.buf_map(fbuf, "n", "<C-s>"), "default <C-s> still mapped")
+    assert.is_nil(fake.buf_map(fbuf, "n", "<CR>"), "<CR> still mapped with submit_normal = false")
+    assert.is_not_nil(fake.buf_map(fbuf, "n", "Q"), "Q not mapped")
+    assert.is_nil(fake.buf_map(fbuf, "n", "q"), "default q still mapped")
+    assert.is_nil(fake.buf_map(fbuf, "n", "<Esc>"), "default <Esc> still mapped")
+    vim.api.nvim_buf_set_lines(fbuf, 0, -1, false, { "override note" })
+    vim.api.nvim_set_current_win(f)
+    fake.press("<C-g>")
+    fake.wait_for(function()
+      return fake.count("--append-notes") >= 1
+    end, "bd update --append-notes after <C-g>")
+  end)
+end)

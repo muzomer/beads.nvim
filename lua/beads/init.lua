@@ -2,7 +2,7 @@ local M = {}
 
 M.defaults = {
   tree = { width = 50 },
-  keys = require("beads.keys").default_map(), -- keys.<view>.<action> = lhs|false
+  keymaps = require("beads.keys").default_map(), -- key, list of keys or false; false disables all
   fzf = "auto",
 }
 
@@ -22,11 +22,27 @@ end
 
 function M.setup(opts)
   add_bin_to_path()
-  M.config = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts or {})
+  opts = opts or {}
+  local keys = require("beads.keys")
+  local over_keymaps = opts.keymaps
+  local rest = vim.deepcopy(opts)
+  rest.keymaps = nil
+  M.config = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), rest)
+  if over_keymaps == nil then
+    M.config.keymaps = vim.deepcopy(M.defaults.keymaps)
+  else
+    M.config.keymaps = keys.merge(vim.deepcopy(M.defaults.keymaps), over_keymaps)
+  end
   if M.config.fzf == "auto" then
     M.config.fzf = pcall(require, "fzf-lua")
   end
+  keys.setup_globals()
   return M
+end
+
+-- "view" | "edit" for a beads detail buffer, "" elsewhere (statusline-friendly).
+function M.mode()
+  return vim.b.beads_mode or ""
 end
 
 return M

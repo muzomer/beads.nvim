@@ -108,6 +108,9 @@ describe("beads detail buffer cli root", function()
       end
     end
     assert.is_true(changed, "title line not found in rendered buffer")
+    if not vim.bo[buf].modifiable then
+      vim.cmd.normal("e") -- beads_nvim-4gx.8: VIEW mode is read-only, e enters EDIT mode
+    end
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local shows = count("show")
     vim.cmd("write")
@@ -166,6 +169,9 @@ describe("beads detail buffer cli root", function()
         lines[i] = l:gsub("Root test", "Root test changed")
         break
       end
+    end
+    if not vim.bo[buf].modifiable then
+      vim.cmd.normal("e") -- beads_nvim-4gx.8: VIEW mode is read-only, e enters EDIT mode
     end
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local shows = count("show")

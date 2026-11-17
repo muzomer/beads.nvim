@@ -9,6 +9,7 @@ local function finish(detail, buf, root)
   store.mark_self_write(root)
   store.refresh(root)
   if vim.api.nvim_buf_is_valid(buf) then
+    detail.enter_view(buf)
     detail.load(buf)
   end
 end
@@ -131,6 +132,7 @@ function M.write(buf)
         return
       end
       if choice == choices[1] then
+        detail.enter_view(buf)
         detail.load(buf)
       elseif choice == choices[2] then
         do_write(buf)

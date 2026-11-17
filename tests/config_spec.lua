@@ -1,7 +1,8 @@
 -- Interface under test (bead beads_nvim-ge7.1):
 --   require("beads").setup(opts?) deep-merges opts over the defaults.
 --   The effective config is exposed as require("beads").config.
---   Defaults: config.tree.width == 50, config.keys is a non-empty table.
+--   Defaults: config.tree.width == 50, config.keymaps is a non-empty table.
+--   (beads_nvim-4gx.8: setup({ keys }) renamed to setup({ keymaps }), no alias.)
 
 local function fresh_beads()
   for name in pairs(package.loaded) do
@@ -19,8 +20,8 @@ describe("beads.setup", function()
       beads.setup()
     end)
     assert.are.equal(50, beads.config.tree.width)
-    assert.are.equal("table", type(beads.config.keys))
-    assert.is_true(next(beads.config.keys) ~= nil, "default keys table is empty")
+    assert.are.equal("table", type(beads.config.keymaps))
+    assert.is_true(next(beads.config.keymaps) ~= nil, "default keymaps table is empty")
   end)
 
   it("accepts an empty table", function()
@@ -34,15 +35,17 @@ describe("beads.setup", function()
   it("deep-merges user options over defaults", function()
     local beads = fresh_beads()
     beads.setup()
-    local default_keys = vim.deepcopy(beads.config.keys)
+    local default_keys = vim.deepcopy(beads.config.keymaps)
 
     beads = fresh_beads()
-    beads.setup({ keys = { my_custom_action = "<leader>zz" }, tree = { width = 60 } })
+    beads.setup({ keymaps = { tree = "<leader>zz" }, tree = { width = 60 } })
 
     assert.are.equal(60, beads.config.tree.width)
-    assert.are.equal("<leader>zz", beads.config.keys.my_custom_action)
+    assert.are.equal("<leader>zz", beads.config.keymaps.tree)
     for name, value in pairs(default_keys) do
-      assert.are.same(value, beads.config.keys[name], "default key lost: " .. tostring(name))
+      if name ~= "tree" then
+        assert.are.same(value, beads.config.keymaps[name], "default key lost: " .. tostring(name))
+      end
     end
   end)
 end)

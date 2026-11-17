@@ -56,7 +56,17 @@ local function line_with_prefix(buf, prefix)
   end
 end
 
+-- beads_nvim-4gx.8: detail buffers open read-only (VIEW mode); `e` switches to EDIT mode.
+local function ensure_edit(buf)
+  if not vim.bo[buf].modifiable then
+    vim.api.nvim_buf_call(buf, function()
+      vim.cmd.normal("e")
+    end)
+  end
+end
+
 local function set_line(buf, pred, new)
+  ensure_edit(buf)
   local lines = buf_lines(buf)
   for i, l in ipairs(lines) do
     if pred(l) then

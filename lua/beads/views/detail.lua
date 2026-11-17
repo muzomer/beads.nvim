@@ -24,7 +24,7 @@ local function bead_id(buf)
   return (vim.api.nvim_buf_get_name(buf):gsub("^beads://", ""))
 end
 
-local function setup_keys(buf)
+local function view_actions(buf)
   local acts = {}
   local function map(_, name, fn)
     acts[name] = fn
@@ -70,10 +70,6 @@ local function setup_keys(buf)
   end))
   local function text_float(title, send)
     return function()
-      if vim.bo[buf].modified then
-        vim.notify("Beads: detail buffer has unsaved changes; :w first", vim.log.levels.WARN)
-        return
-      end
       local b = M.snapshot(buf)
       if not b then
         return
@@ -93,7 +89,12 @@ local function setup_keys(buf)
         col = math.max(0, math.floor((vim.o.columns - width) / 2)),
         style = "minimal",
         border = "rounded",
-        title = " " .. title .. " (<C-s> confirm, q cancel) ",
+        title = string.format(
+          " %s (%s confirm, %s cancel) ",
+          title,
+          keys.first("input", "submit") or "",
+          keys.first("input", "cancel") or ""
+        ),
       })
       local function close()
         if vim.api.nvim_win_is_valid(win) then
@@ -113,16 +114,7 @@ local function setup_keys(buf)
         cli.set_root(prev)
       end
       vim.api.nvim_create_autocmd("BufWriteCmd", { buffer = fbuf, callback = confirm })
-      local function o(desc)
-        return { buffer = fbuf, nowait = true, silent = true, desc = "Beads " .. title:lower() .. ": " .. desc }
-      end
-      vim.keymap.set("n", "<C-s>", confirm, o("confirm"))
-      vim.keymap.set("i", "<C-s>", function()
-        vim.cmd("stopinsert")
-        confirm()
-      end, o("confirm"))
-      vim.keymap.set("n", "q", close, o("cancel"))
-      vim.keymap.set("n", "<Esc>", close, o("cancel"))
+      keys.bind_input(fbuf, confirm, close)
       vim.cmd("startinsert")
     end
   end
@@ -134,7 +126,64 @@ local function setup_keys(buf)
   map(buf, "yank_run", with_bead(function(b)
     vim.fn.setreg('"', workflow.run_command(b))
   end))
-  keys.bind(buf, "detail", acts)
+  acts.edit = function()
+    M.enter_edit(buf)
+  end
+  acts.close = function()
+    pcall(vim.cmd, "close")
+  end
+  return acts
+end
+
+local bound = {} -- buf -> list of { mode, lhs } set for the current mode
+
+local function edit_actions(buf)
+  return {
+    save = function()
+      vim.cmd("stopinsert")
+      vim.cmd("write")
+    end,
+    view = function()
+      if not vim.bo[buf].modified then
+        return M.enter_view(buf)
+      end
+      local choices = { "Discard unsaved edits", "Keep editing" }
+      vim.ui.select(choices, { prompt = "Beads: unsaved edits" }, function(choice)
+        if choice == choices[1] and vim.api.nvim_buf_is_valid(buf) then
+          M.enter_view(buf)
+          vim.bo[buf].modified = false
+          M.load(buf)
+        end
+      end)
+    end,
+  }
+end
+
+local function set_mode(buf, mode)
+  keys.unbind(buf, bound[buf])
+  vim.b[buf].beads_mode = mode
+  vim.bo[buf].modifiable = mode == "edit"
+  if mode == "view" then
+    bound[buf] = keys.bind(buf, "detail_view", view_actions(buf))
+  else
+    local acts = edit_actions(buf)
+    if state[buf] and state[buf].new then
+      acts.view = nil
+    end
+    bound[buf] = keys.bind(buf, "detail_edit", acts, { save = { "n", "i" } })
+  end
+end
+
+function M.enter_edit(buf)
+  if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].beads_mode ~= "edit" then
+    set_mode(buf, "edit")
+  end
+end
+
+function M.enter_view(buf)
+  if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].beads_mode ~= "view" then
+    set_mode(buf, "view")
+  end
 end
 
 local function apply(buf, bead)
@@ -143,6 +192,7 @@ local function apply(buf, bead)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modified = false
+  vim.bo[buf].modifiable = vim.b[buf].beads_mode == "edit"
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   for _, r in ipairs(regions) do
     for row = r.first - 1, r.last - 1 do
@@ -276,6 +326,8 @@ function M.adopt(buf, id)
     pcall(vim.api.nvim_buf_delete, old, { force = true })
   end
   subscribe(buf)
+  state[buf].new = nil
+  M.enter_view(buf)
   M.load(buf)
 end
 
@@ -292,7 +344,6 @@ function M.load(buf)
     vim.bo[buf].swapfile = false
     vim.bo[buf].bufhidden = "hide"
     vim.bo[buf].filetype = "markdown"
-    setup_keys(buf)
     if id ~= "new" then
       subscribe(buf)
     end
@@ -301,11 +352,17 @@ function M.load(buf)
       once = true,
       callback = function()
         state[buf] = nil
+        bound[buf] = nil
       end,
     })
   end
   if id == "new" then
-    return load_new(buf)
+    load_new(buf)
+    set_mode(buf, "edit")
+    return
+  end
+  if not vim.b[buf].beads_mode then
+    set_mode(buf, "view")
   end
   local prev = cli.get_root_override()
   cli.set_root(state[buf].root)

@@ -7,7 +7,7 @@
 --     the detail buffer reloads and shows the text in its Notes section.
 --   * 'c' does the same with 'bd comment' (or 'bd comments add'); the text shows in Comments.
 --   * Empty text on confirm: no bd call.
---   * Detail buffer modified: n/c open no float, make no bd call, and notify a message telling to :w.
+--   * Detail buffer modified (EDIT mode, beads_nvim-4gx.8): n/c open no float and make no bd call.
 --   * q or <Esc> in normal mode in the float closes it without a bd call.
 -- The bd root is taken from beads.cli (cli.set_root).
 
@@ -323,25 +323,27 @@ describe("beads detail " .. KEY .. " float", function()
       end)
     end)
 
-    it(key .. " on a modified detail buffer refuses with a message and opens no float", function()
+    -- beads_nvim-4gx.8 (owner-approved change): a detail buffer can only be modified in EDIT mode,
+    -- where n / c are plain Vim keys. They must open no float, make no bd call and keep the edits.
+    it(key .. " in edit mode with unsaved edits opens no float and makes no bd call", function()
       in_repo(function(dir)
         local id = create(dir, "Dirty " .. key)
         local buf = open(id, "Dirty " .. key)
+        if not vim.bo[buf].modifiable then
+          vim.cmd.normal("e")
+        end
+        vim.cmd("stopinsert")
         vim.api.nvim_buf_set_lines(buf, -1, -1, false, { "unsaved edit" })
         assert.is_true(vim.bo[buf].modified)
         calls, notes = {}, {}
-        vim.cmd.normal(key)
+        vim.fn.setreg("/", "unsaved edit")
+        pcall(vim.cmd.normal, key)
+        vim.cmd("stopinsert")
         vim.wait(300)
 
         assert.same({}, floats(), "a float opened on a modified buffer")
         assert.equals(buf, vim.api.nvim_get_current_buf())
         assert.same({}, mutating_calls(), "bd called on a modified buffer")
-        local msgs = {}
-        for _, n in ipairs(notes) do
-          msgs[#msgs + 1] = n.msg
-        end
-        local text = table.concat(msgs, "\n")
-        assert.is_truthy(text:find(":w", 1, true), "no message asking to :w first: " .. vim.inspect(notes))
         assert.is_true(has_line(buf, "unsaved edit"), "unsaved edit lost")
       end)
     end)

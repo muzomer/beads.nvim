@@ -203,7 +203,7 @@ local function setup_keys(v, tab)
   map("close", function()
     close(tab)
   end)
-  keys.bind(v.buf, "tree", acts)
+  keys.bind(v.buf, "tree_view", acts)
 end
 
 local function open()

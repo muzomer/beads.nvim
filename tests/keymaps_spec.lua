@@ -1,13 +1,13 @@
--- Interface under test (bead beads_nvim-ge7.16): keymap overrides and g? help across views.
---   require("beads").setup({ keys = { <view> = { <action> = lhs|false } } }) configures the
---   buffer-local maps of each view; false removes that map. Keys are nested per view.
+-- Interface under test (bead beads_nvim-ge7.16, adapted for beads_nvim-4gx.8 with owner approval):
+--   require("beads").setup({ keymaps = { ... } }) configures the maps; false removes a map.
 --   Action names used here (others are the implementer's choice):
---     keys.tree.refresh  (default "R")
---     keys.tree.yank_id  (default "yy")
---     keys.detail.claim  (default "C")
+--     keymaps.tree_view.refresh     (default "R")   -- buffer-local tree keys
+--     keymaps.tree_view.yank_id     (default "yy")
+--     keymaps.detail.view.claim     (default "C")   -- detail buffer, VIEW mode
 --   g? in a view opens a floating window listing the active keys of that view (lhs + description).
 --   Every buffer-local map the plugin sets carries a non-empty desc (which-key).
---   No global (non-buffer-local) keymaps are ever set.
+--   The only global keymaps are the documented normal-mode <leader>b{t,r,l,s,n,e,c,?} maps,
+--   each with a desc; <leader>bd is never mapped.
 -- bd is a fake on PATH (tests/picker_fake.lua).
 
 -- Snapshot global keymaps BEFORE anything from the plugin is loaded or sourced.
@@ -150,7 +150,7 @@ describe("beads keymaps", function()
   end)
 
   it("overriding a tree key changes the mapping", function()
-    require("beads").setup({ keys = { tree = { refresh = "<F5>" } } })
+    require("beads").setup({ keymaps = { tree_view = { refresh = "<F5>" } } })
     local _, buf = open_tree()
     local km = buf_map(buf, "n", "<F5>")
     assert.is_not_nil(km, "overridden refresh key <F5> is not mapped in the tree buffer")
@@ -159,7 +159,7 @@ describe("beads keymaps", function()
   end)
 
   it("g? in the tree opens a float listing the overridden key, not the default", function()
-    require("beads").setup({ keys = { tree = { refresh = "<F5>" } } })
+    require("beads").setup({ keymaps = { tree_view = { refresh = "<F5>" } } })
     local win = open_tree()
     local f = press_for_float(win, "g?")
     assert.is_not_nil(f, "g? in the tree opened no floating window")
@@ -177,16 +177,16 @@ describe("beads keymaps", function()
   end)
 
   it("setting a tree key to false removes the mapping", function()
-    require("beads").setup({ keys = { tree = { yank_id = false } } })
+    require("beads").setup({ keymaps = { tree_view = { yank_id = false } } })
     local _, buf = open_tree()
-    assert.is_nil(buf_map(buf, "n", "yy"), "yy still mapped in tree with keys.tree.yank_id = false")
+    assert.is_nil(buf_map(buf, "n", "yy"), "yy still mapped in tree with keymaps.tree_view.yank_id = false")
     assert.is_not_nil(buf_map(buf, "n", "R"), "other tree keys were lost")
   end)
 
   it("setting a detail key to false removes the mapping", function()
-    require("beads").setup({ keys = { detail = { claim = false } } })
+    require("beads").setup({ keymaps = { detail = { view = { claim = false } } } })
     local _, buf = open_detail("op-a")
-    assert.is_nil(buf_map(buf, "n", "C"), "C still mapped in detail with keys.detail.claim = false")
+    assert.is_nil(buf_map(buf, "n", "C"), "C still mapped in detail with keymaps.detail.view.claim = false")
     assert.is_not_nil(buf_map(buf, "n", "x"), "other detail keys were lost")
   end)
 
@@ -218,8 +218,7 @@ describe("beads keymaps", function()
     close_float(th)
   end)
 
-  -- passes already: guards that no global keymaps are set
-  it("sets no global keymaps after loading and using the plugin", function()
+  it("sets exactly the documented global keymaps, each with a desc, and never <leader>bd", function()
     require("beads").setup({})
     local twin = open_tree()
     close_float(press_for_float(twin, "g?"))
@@ -232,10 +231,21 @@ describe("beads keymaps", function()
     local added = {}
     for k in pairs(global_maps()) do
       if not BASELINE[k] then
-        added[#added + 1] = (k:gsub("%z", " "))
+        local mode, lhs = k:match("^(.-)%z(.*)$")
+        added[#added + 1] = mode .. " " .. lhs_norm(lhs)
       end
     end
     table.sort(added)
-    assert.are.same({}, added, "global keymaps added: " .. table.concat(added, ", "))
+    local want = {}
+    for _, k in ipairs({ "t", "r", "l", "s", "n", "e", "c", "?" }) do
+      local m = vim.fn.maparg("<leader>b" .. k, "n", false, true)
+      assert.is_true(next(m) ~= nil, "<leader>b" .. k .. " is not mapped")
+      assert.is_true(m.buffer ~= 1, "<leader>b" .. k .. " is buffer-local, not global")
+      assert.is_true(type(m.desc) == "string" and m.desc ~= "", "<leader>b" .. k .. " has no desc")
+      want[#want + 1] = "n " .. lhs_norm(m.lhs)
+    end
+    table.sort(want)
+    assert.are.same(want, added, "global keymaps added: " .. table.concat(added, ", "))
+    assert.are.equal("", vim.fn.maparg("<leader>bd", "n"), "<leader>bd is mapped")
   end)
 end)
