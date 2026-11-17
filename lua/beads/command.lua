@@ -26,6 +26,10 @@ function M.run(args)
     vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
     return
   end
+  if sub == "tree" then
+    require("beads.views.tree").toggle()
+    return
+  end
   if sub == "create" then
     require("beads.views.detail").open_new()
     return
