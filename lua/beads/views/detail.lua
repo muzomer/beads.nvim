@@ -171,6 +171,63 @@ local function subscribe(buf)
   vim.api.nvim_create_autocmd("BufWipeout", { buffer = buf, once = true, callback = unsub })
 end
 
+local pending_parent
+
+-- Fills a beads://new buffer with the create template.
+local function load_new(buf)
+  local parent = pending_parent
+  pending_parent = nil
+  state[buf] = { bead = nil, root = state[buf] and state[buf].root or cli.get_root(), new = true }
+  local lines = render.template({ parent = parent })
+  vim.bo[buf].modifiable = true
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].modified = false
+end
+
+-- Opens beads://new in the current window; parent (optional) is prefilled.
+function M.create_child(parent_id)
+  local existing = vim.fn.bufnr("beads://new")
+  if existing ~= -1 and vim.api.nvim_buf_is_valid(existing) then
+    if vim.bo[existing].modified and not parent_id then
+      vim.api.nvim_set_current_buf(existing)
+      return
+    end
+    if vim.api.nvim_get_current_buf() == existing then
+      vim.cmd("enew")
+    end
+    pcall(vim.api.nvim_buf_delete, existing, { force = true })
+  end
+  pending_parent = parent_id
+  vim.cmd.edit("beads://new")
+end
+
+function M.open_new()
+  M.create_child(nil)
+end
+
+-- True when buf is an unsaved beads://new buffer.
+function M.is_new(buf)
+  return state[buf] ~= nil and state[buf].new == true
+end
+
+-- After a successful create: rename to beads://<id> and reload as a normal detail buffer.
+function M.adopt(buf, id)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  local root = state[buf] and state[buf].root or cli.get_root()
+  state[buf] = { root = root }
+  vim.api.nvim_buf_set_name(buf, "beads://" .. id)
+  vim.bo[buf].modified = false
+  -- drop the alternate buffer left by the rename
+  local old = vim.fn.bufnr("beads://new")
+  if old ~= -1 and old ~= buf then
+    pcall(vim.api.nvim_buf_delete, old, { force = true })
+  end
+  subscribe(buf)
+  M.load(buf)
+end
+
 -- (Re)loads the buffer from bd; safe to call from BufReadCmd or after a write.
 function M.load(buf)
   if not vim.api.nvim_buf_is_valid(buf) then
@@ -185,7 +242,9 @@ function M.load(buf)
     vim.bo[buf].bufhidden = "hide"
     vim.bo[buf].filetype = "markdown"
     setup_keys(buf)
-    subscribe(buf)
+    if id ~= "new" then
+      subscribe(buf)
+    end
     vim.api.nvim_create_autocmd("BufWipeout", {
       buffer = buf,
       once = true,
@@ -193,6 +252,9 @@ function M.load(buf)
         state[buf] = nil
       end,
     })
+  end
+  if id == "new" then
+    return load_new(buf)
   end
   local prev = cli.get_root_override()
   cli.set_root(state[buf].root)

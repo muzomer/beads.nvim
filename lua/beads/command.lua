@@ -26,6 +26,10 @@ function M.run(args)
     vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
     return
   end
+  if sub == "create" then
+    require("beads.views.detail").open_new()
+    return
+  end
   vim.notify("Beads " .. sub .. ": not implemented yet", vim.log.levels.WARN)
 end
 

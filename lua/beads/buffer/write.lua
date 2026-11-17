@@ -13,6 +13,48 @@ local function finish(detail, buf, root)
   end
 end
 
+-- :w on beads://new: one 'bd create', then rename + reload.
+local creating = {}
+
+local function do_create(buf)
+  if creating[buf] then
+    return
+  end
+  local detail = require("beads.views.detail")
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local plan = diff.create(lines)
+  if vim.trim(plan.args[3] or "") == "" then
+    vim.notify("Beads: title is required (set the '# ' heading)", vim.log.levels.ERROR)
+    return
+  end
+  -- 'blocks:<id>' would make the new bead block <id>; a bare id makes it depend on (be blocked by) <id>.
+  for i, a in ipairs(plan.args) do
+    if plan.args[i - 1] == "--deps" then
+      plan.args[i] = (a:gsub("blocks:", ""))
+    end
+  end
+  local root = detail.root(buf)
+  local prev = cli.get_root_override()
+  cli.set_root(root)
+  creating[buf] = true
+  cli.run_with_files(plan.args, plan.files, function(res)
+    creating[buf] = nil
+    if res.err then
+      vim.notify("Beads: create failed: " .. res.err, vim.log.levels.ERROR)
+      return -- keep the user's edits
+    end
+    local item = type(res.data) == "table" and (res.data[1] or res.data) or nil
+    if not item or not item.id then
+      vim.notify("Beads: create succeeded but no id was returned", vim.log.levels.ERROR)
+      return
+    end
+    store.mark_self_write(root)
+    store.refresh(root)
+    detail.adopt(buf, item.id)
+  end)
+  cli.set_root(prev)
+end
+
 local function do_write(buf)
   local detail = require("beads.views.detail")
   local bead = detail.snapshot(buf)
@@ -65,6 +107,9 @@ end
 -- Re-fetches the bead first; a changed updated_at refuses the write and offers reload / force / diff.
 function M.write(buf)
   local detail = require("beads.views.detail")
+  if detail.is_new(buf) then
+    return do_create(buf)
+  end
   local seen = detail.snapshot(buf)
   if not seen then
     return do_write(buf)
