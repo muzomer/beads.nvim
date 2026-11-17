@@ -88,6 +88,14 @@ function M.close(id, reason, cb)
   run(args, true, cb)
 end
 
+function M.append_note(id, text, cb)
+  run({ "update", id, "--append-notes", text, "--json" }, true, cb)
+end
+
+function M.comment(id, text, cb)
+  M.run_with_files({ "comment", id }, { ["--file"] = text }, cb)
+end
+
 -- lines: bd batch grammar lines, passed via a temp file.
 function M.batch(lines, cb)
   local path = vim.fn.tempname()

@@ -26,6 +26,8 @@ end
 local HELP = {
   "x   close bead (prompts for a reason)",
   "C   claim bead",
+  "n   append a note (float; <C-s> or :w confirms)",
+  "c   add a comment (float; <C-s> or :w confirms)",
   "yy  yank bead id",
   "yr  yank workflow run command",
   "g?  show this help",
@@ -75,6 +77,64 @@ local function setup_keys(buf)
     cli.claim(b.id, after(root))
     cli.set_root(prev)
   end), "claim")
+  local function text_float(title, send)
+    return function()
+      if vim.bo[buf].modified then
+        vim.notify("Beads: detail buffer has unsaved changes; :w first", vim.log.levels.WARN)
+        return
+      end
+      local b = M.snapshot(buf)
+      if not b then
+        return
+      end
+      local root = M.root(buf)
+      local fbuf = vim.api.nvim_create_buf(false, true)
+      vim.bo[fbuf].buftype = "acwrite"
+      vim.bo[fbuf].bufhidden = "wipe"
+      vim.bo[fbuf].filetype = "markdown"
+      vim.api.nvim_buf_set_name(fbuf, "beads-float:" .. title .. ":" .. b.id .. ":" .. fbuf)
+      local width = math.min(70, math.max(20, vim.o.columns - 4))
+      local win = vim.api.nvim_open_win(fbuf, true, {
+        relative = "editor",
+        width = width,
+        height = 8,
+        row = math.max(0, math.floor((vim.o.lines - 8) / 2)),
+        col = math.max(0, math.floor((vim.o.columns - width) / 2)),
+        style = "minimal",
+        border = "rounded",
+        title = " " .. title .. " (<C-s> confirm, q cancel) ",
+      })
+      local function close()
+        if vim.api.nvim_win_is_valid(win) then
+          pcall(vim.api.nvim_win_close, win, true)
+        end
+      end
+      local function confirm()
+        local text = vim.trim(table.concat(vim.api.nvim_buf_get_lines(fbuf, 0, -1, false), "\n"))
+        vim.bo[fbuf].modified = false
+        close()
+        if text == "" then
+          return
+        end
+        local prev = cli.get_root_override()
+        cli.set_root(root)
+        send(b.id, text, after(root))
+        cli.set_root(prev)
+      end
+      vim.api.nvim_create_autocmd("BufWriteCmd", { buffer = fbuf, callback = confirm })
+      local o = { buffer = fbuf, nowait = true, silent = true }
+      vim.keymap.set("n", "<C-s>", confirm, o)
+      vim.keymap.set("i", "<C-s>", function()
+        vim.cmd("stopinsert")
+        confirm()
+      end, o)
+      vim.keymap.set("n", "q", close, o)
+      vim.keymap.set("n", "<Esc>", close, o)
+      vim.cmd("startinsert")
+    end
+  end
+  map(buf, "n", text_float("Note", cli.append_note), "append note")
+  map(buf, "c", text_float("Comment", cli.comment), "add comment")
   map(buf, "yy", with_bead(function(b)
     vim.fn.setreg('"', b.id)
   end), "yank id")
