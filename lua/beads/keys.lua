@@ -76,7 +76,8 @@ M.defaults = {
   picker = {
     { "yank_id", "ctrl-y", "yank bead id" },
     { "yank_run", "alt-r", "yank workflow run command" },
-    { "close", "ctrl-x", "close bead" },
+    { "close", "ctrl-x", "close bead(s)" },
+    { "actions", "ctrl-a", "action menu for the selected beads" },
   },
 }
 
