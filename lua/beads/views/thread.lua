@@ -176,6 +176,9 @@ function M.open(dbuf, idx)
       vim.fn.setreg('"', workflow.run_command(b))
     end
   end
+  acts.peek = function()
+    require("beads.views.peek").at_cursor(root)
+  end
   keys.bind(fbuf, "thread", acts)
   render()
 end

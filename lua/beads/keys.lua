@@ -15,6 +15,7 @@ M.defaults = {
     { "filter", "f", "filter (text, status: label: assignee: type:)" },
     { "sort", "s", "cycle sort: priority, updated, id" },
     { "layout", "L", "cycle layout: left, bottom, right, top" },
+    { "peek", "gd", "peek the bead id under the cursor (float)" },
     { "yank_id", "yy", "yank bead id" },
     { "yank_run", "yr", "yank workflow run command" },
     { "close", "q", "close tree" },
@@ -30,6 +31,7 @@ M.defaults = {
     { "next_bead", "]b", "next bead in tree order (count ok)" },
     { "prev_bead", "[b", "previous bead in tree order (count ok)" },
     { "ask", "a", "ask a question about the section / selection" },
+    { "peek", "gd", "peek the bead id under the cursor (float)" },
     { "note", "n", "append a note (float)" },
     { "comment", "c", "add a comment (float)" },
     { "yank_id", "yy", "yank bead id" },
@@ -42,10 +44,20 @@ M.defaults = {
     { "resolve", "x", "resolve thread" },
     { "apply", "a", "apply the proposal to the bead (unsaved edit)" },
     { "yank_run", "yr", "yank workflow run command (human threads)" },
+    { "peek", "gd", "peek the bead id under the cursor (float)" },
     { "next", "n", "next thread" },
     { "prev", "p", "previous thread" },
     { "help", { "?", "g?" }, "show this help" },
     { "close", { "q", "<Esc>" }, "close" },
+  },
+  peek = {
+    { "peek", "gd", "peek the bead id under the cursor (stacks another float)" },
+    { "close", { "q", "<Esc>" }, "close the top peek float" },
+    { "close_all", "Q", "close all peek floats" },
+    { "open", "<CR>", "open this bead in the main window, close all peeks" },
+    { "yank_id", "yy", "yank bead id" },
+    { "yank_run", "yr", "yank workflow run command" },
+    { "help", "?", "show this help" },
   },
   detail_edit = {
     { "save", "<C-s>", "save (normal and insert)" },
@@ -113,6 +125,7 @@ function M.default_map()
   out.input = fill("input")
   out.picker = fill("picker")
   out.thread = fill("thread")
+  out.peek = fill("peek")
   return out
 end
 
@@ -178,6 +191,7 @@ local TITLES = {
   detail_view = "detail view",
   detail_edit = "detail edit",
   thread = "thread",
+  peek = "peek",
   input = "input",
   global = "global",
 }
@@ -188,10 +202,11 @@ local HEADINGS = {
   detail_view = "View mode",
   detail_edit = "Edit mode",
   thread = "Thread",
+  peek = "Peek",
   input = "Input",
   global = "Global",
 }
-local MODES = { tree_view = "tree", detail_view = "view", detail_edit = "edit", thread = "thread", input = "input" }
+local MODES = { tree_view = "tree", detail_view = "view", detail_edit = "edit", thread = "thread", peek = "peek", input = "input" }
 
 local EXTRA = {
   tree_view = { "za/zo/zc  fold" },

@@ -40,6 +40,7 @@ returns the mode for a statusline.
 | `<CR>` | `open_thread` | open the question thread under the cursor (`## Questions`) |
 | `]u`, `[u` | `next_waiting`, `prev_waiting` | jump to the next / previous thread waiting for you |
 | `]b`, `[b` | `next_bead`, `prev_bead` | open the next / previous bead in tree order in this window (a count works; follows the open tree's sort, filter and `H`) |
+| `gd` | `peek` | peek the bead id under the cursor in a floating read-only detail (see "Peek floats"); other words fall back to Vim's `gd` |
 | `n` | `note` | append a note (float) |
 | `c` | `comment` | add a comment (float) |
 | `a` | `ask` | ask a question about the section under the cursor (or the visual selection) |
@@ -63,12 +64,16 @@ failed or refused save stays in EDIT). `beads://new` opens in EDIT mode.
 unsaved edit of the detail buffer (`apply`), `n` / `p` next / previous thread (`next`, `prev`), `yr` yank
 the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` close (`close`).
 
+### Peek floats (`gd`)
+
+`gd` on a bead id (detail VIEW, tree, thread float) opens that bead in a floating, read-only detail view with the same rendering and highlighting; it follows live updates (the watcher is held while any peek float is open). Floats stack, offset down and right; `gd` on a bead already open focuses it. `keymaps.detail.view.peek`, `keymaps.tree_view.peek` and `keymaps.thread.peek` set the `gd` key (`false` disables). In a float (`keymaps.peek.*`): `gd` peek (`peek`), `q` / `<Esc>` close the top float (`close`), `Q` close all (`close_all`), `<CR>` open the bead in the main window and close all (`open`), `yy` yank id (`yank_id`), `yr` yank run command (`yank_run`), `?` help (`help`).
+
 ### Tree
 
 `tree.width` (left/right) and `tree.height` (bottom/top) default to `"auto"`: the tree fits its longest visible line (at least 24 columns) or its visible row count (at least 6), refitting after every render and on `VimResized`. `tree.max_width` (default half the columns) and `tree.max_height` (default 40% of the lines) cap the auto size. A number keeps a fixed size. Resizing the tree window by hand stops auto-fit until the tree is reopened.
 
 `keymaps.tree_view.*`: `<CR>` open, `a` add child, `x` close, `C` claim, `R` refresh, `H` toggle closed, `L` cycle the layout (left, bottom, right, top), `f` filter (free text plus `status:`, `label:`, `assignee:`, `type:` tokens; empty clears), `s` cycle the sort (priority, updated, id),
-`yy` yank id, `yr` yank run command, `q` close, `?` / `g?` help, `za`/`zo`/`zc` fold.
+`gd` peek, `yy` yank id, `yr` yank run command, `q` close, `?` / `g?` help, `za`/`zo`/`zc` fold.
 
 ### Input floats (note, comment)
 

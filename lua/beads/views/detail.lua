@@ -126,6 +126,9 @@ local function view_actions(buf)
   map(buf, "yank_run", with_bead(function(b)
     workflow.yank(workflow.run_command(b))
   end))
+  acts.peek = function()
+    require("beads.views.peek").at_cursor(M.root(buf))
+  end
   acts.open_thread = function()
     local idx = M.thread_at(buf, vim.api.nvim_win_get_cursor(0)[1])
     if idx then
@@ -396,7 +399,7 @@ function M.thread_at(buf, row)
 end
 
 -- Threads of bead `id`: stored ones plus the async human ones; cb(threads).
-local function gather(root, id, cb)
+function M.gather(root, id, cb)
   local ok, threads = pcall(require("beads.questions.store").list, root, { bead = id })
   threads = ok and threads or {}
   require("beads.questions.human").list(root, function(res)
@@ -415,7 +418,7 @@ function M.refresh_threads(buf, cb)
   if not (st and st.bead) then
     return
   end
-  gather(st.root, st.bead.id, function(threads)
+  M.gather(st.root, st.bead.id, function(threads)
     local cur = state[buf]
     if not (vim.api.nvim_buf_is_valid(buf) and cur and cur.bead) then
       return
@@ -670,6 +673,12 @@ apply = function(buf, bead)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modified = false
   vim.bo[buf].modifiable = vim.b[buf].beads_mode == "edit"
+  M.decorate(buf, bead, lines, regions)
+  attach_winbar(buf)
+end
+
+-- The detail highlighting (dim regions, values, relative comment times) of a rendered bead.
+function M.decorate(buf, bead, lines, regions)
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   for _, r in ipairs(regions) do
     for row = r.first - 1, r.last - 1 do
@@ -678,7 +687,6 @@ apply = function(buf, bead)
   end
   highlight_values(buf, lines, bead)
   relative_times(buf, bead, regions)
-  attach_winbar(buf)
 end
 
 -- Fetches the current server version of the bead; cb(bead|nil, err).
@@ -891,7 +899,7 @@ function M.load(buf)
       return
     end
     local bead = model.normalize(item)
-    gather(state[buf].root, bead.id, function(threads)
+    M.gather(state[buf].root, bead.id, function(threads)
       if not vim.api.nvim_buf_is_valid(buf) or not state[buf] then
         return
       end
