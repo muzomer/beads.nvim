@@ -72,7 +72,14 @@ local function calls(r)
   if vim.fn.filereadable(f) == 0 then
     return {}
   end
-  return vim.fn.readfile(f)
+  -- the store also runs bd ready inside a refresh (header count); these tests are about bd list
+  local out = {}
+  for _, line in ipairs(vim.fn.readfile(f)) do
+    if not (" " .. line .. " "):find(" ready ", 1, true) then
+      out[#out + 1] = line
+    end
+  end
+  return out
 end
 
 local function hold()

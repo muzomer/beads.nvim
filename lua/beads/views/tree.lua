@@ -13,24 +13,48 @@ local views = {} -- tabpage -> { win, buf, root, show_closed, ids, unsub, releas
 local F = require("beads.ui.format")
 local sorted = F.sort
 
+local function create_key()
+  local k = (require("beads").config.keymaps or {}).create
+  if type(k) == "table" then
+    k = k[1]
+  end
+  return type(k) == "string" and k or "create"
+end
+
+local MARK_PRI, DIM_PRI = 100, 200
+
+-- Returns lines, ids (row -> bead id), marks (row -> { {col, end_col, group, priority} }).
 local function build_lines(v, st)
-  local lines, ids, hls, hls_off = {}, {}, {}, {}
+  local lines, ids, marks = {}, {}, {}
   local seen = {}
   local function visible(b)
     return v.show_closed or b.status ~= "closed"
   end
-  local function emit(b, depth)
+  -- Visible children of b; hidden children are replaced by their visible descendants.
+  local function vis_children(b, stack)
+    local out = {}
+    for _, c in ipairs(sorted(st.children_of(b.id))) do
+      if not stack[c.id] then
+        if visible(c) then
+          out[#out + 1] = c
+        else
+          stack[c.id] = true
+          vim.list_extend(out, vis_children(c, stack))
+          stack[c.id] = nil
+        end
+      end
+    end
+    return out
+  end
+  local function add_mark(row, col, end_col, group, pri)
+    marks[row] = marks[row] or {}
+    table.insert(marks[row], { col = col, end_col = end_col, group = group, priority = pri })
+  end
+  local function emit(b, depth, cells, last)
     if seen[b.id] then
       return
     end
     seen[b.id] = true
-    if not visible(b) then
-      -- hidden bead: still show its visible descendants at this depth
-      for _, c in ipairs(sorted(st.children_of(b.id))) do
-        emit(c, depth)
-      end
-      return
-    end
     local blockers = {}
     for _, bid in ipairs(b.blocked_by or {}) do
       local blk = st.by_id[bid]
@@ -38,14 +62,50 @@ local function build_lines(v, st)
         blockers[#blockers + 1] = bid
       end
     end
+    local kids = vis_children(b, { [b.id] = true })
     local text, ranges = F.format(b, { blockers = blockers })
-    local indent = string.rep("  ", depth)
-    lines[#lines + 1] = indent .. text
-    hls[#lines] = ranges
-    hls_off[#lines] = #indent
-    ids[#lines] = b.id
-    for _, c in ipairs(sorted(st.children_of(b.id))) do
-      emit(c, depth + 1)
+    local guide = table.concat(cells)
+    if depth > 0 then
+      guide = guide .. (last and "└ " or "├ ")
+    end
+    local prefix = guide .. (#kids > 0 and "▾ " or "  ")
+    local suffix = ""
+    if b.type == "epic" then
+      local direct = st.children_of(b.id)
+      if #direct > 0 then
+        local closed = 0
+        for _, c in ipairs(direct) do
+          if c.status == "closed" then
+            closed = closed + 1
+          end
+        end
+        suffix = (" [%d/%d]"):format(closed, #direct)
+      end
+    end
+    local row = #lines + 1
+    lines[row] = prefix .. text .. suffix
+    ids[row] = b.id
+    if #guide > 0 then
+      add_mark(row, 0, #guide, "BeadsGuide", MARK_PRI)
+    end
+    if #kids > 0 then
+      add_mark(row, #guide, #prefix, "BeadsGuide", MARK_PRI)
+    end
+    for _, r in ipairs(ranges) do
+      add_mark(row, #prefix + r.col, #prefix + r.end_col, r.group, MARK_PRI)
+    end
+    if #suffix > 0 then
+      add_mark(row, #prefix + #text, #prefix + #text + #suffix, "BeadsDim", MARK_PRI)
+    end
+    if b.status == "closed" then
+      add_mark(row, #prefix, #prefix + #text, "BeadsDim", DIM_PRI)
+    end
+    local child_cells = vim.list_slice(cells)
+    if depth > 0 then
+      child_cells[#child_cells + 1] = last and "  " or "│ "
+    end
+    for i, c in ipairs(kids) do
+      emit(c, depth + 1, child_cells, i == #kids)
     end
   end
   local roots = st.roots()
@@ -54,10 +114,35 @@ local function build_lines(v, st)
       roots[#roots + 1] = b
     end
   end
+  local top = {}
+  local stack = {}
   for _, b in ipairs(sorted(roots)) do
-    emit(b, 0)
+    if visible(b) then
+      top[#top + 1] = b
+    else
+      stack[b.id] = true
+      vim.list_extend(top, vis_children(b, stack))
+      stack[b.id] = nil
+    end
   end
-  return lines, ids, hls, hls_off
+  for _, b in ipairs(top) do
+    emit(b, 0, {}, false)
+  end
+  return lines, ids, marks
+end
+
+local function header_text(v, st)
+  local open, need = 0, 0
+  for _, b in pairs(st.by_id) do
+    if b.status == "open" then
+      open = open + 1
+    end
+    if b.status ~= "closed" and (b.waiting_user or require("beads.workflow").is_needs_me(b)) then
+      need = need + 1
+    end
+  end
+  local name = vim.fn.fnamemodify((v.root:gsub("/+$", "")), ":t")
+  return ("beads · %s · %d open · %d ready · %d need you"):format(name, open, store.get(v.root).ready_n or 0, need)
 end
 
 local function render(v)
@@ -68,17 +153,40 @@ local function render(v)
   if vim.api.nvim_win_is_valid(v.win) then
     cur_id = v.ids[vim.api.nvim_win_get_cursor(v.win)[1]]
   end
-  local lines, ids, hls, offs = build_lines(v, store.get(v.root))
+  local st = store.get(v.root)
+  local lines, ids, marks = build_lines(v, st)
+  if v.not_repo then
+    lines, ids, marks = { "Not a beads repo — run bd init" }, {}, {}
+  elseif v.loaded then
+    local head = { header_text(v, st) }
+    if next(st.by_id) == nil then
+      head[2] = "No beads here — " .. create_key() .. " to create"
+    end
+    local n = #head
+    local nl, ni, nm = vim.list_extend(head, lines), {}, {}
+    for row, id in pairs(ids) do
+      ni[row + n] = id
+    end
+    for row, m in pairs(marks) do
+      nm[row + n] = m
+    end
+    lines, ids, marks = nl, ni, nm
+    marks[1] = { { col = 0, end_col = #lines[1], group = "BeadsHeader", priority = MARK_PRI } }
+    if n == 2 then
+      marks[2] = { { col = 0, end_col = #lines[2], group = "BeadsDim", priority = MARK_PRI } }
+    end
+  end
   v.ids = ids
   vim.bo[v.buf].modifiable = true
   vim.api.nvim_buf_set_lines(v.buf, 0, -1, false, lines)
   vim.bo[v.buf].modifiable = false
   vim.api.nvim_buf_clear_namespace(v.buf, NS, 0, -1)
-  for row, ranges in pairs(hls) do
-    for _, r in ipairs(ranges) do
-      vim.api.nvim_buf_set_extmark(v.buf, NS, row - 1, offs[row] + r.col, {
-        end_col = offs[row] + r.end_col,
-        hl_group = r.group,
+  for row, ms in pairs(marks) do
+    for _, m in ipairs(ms) do
+      vim.api.nvim_buf_set_extmark(v.buf, NS, row - 1, m.col, {
+        end_col = m.end_col,
+        hl_group = m.group,
+        priority = m.priority,
       })
     end
   end
@@ -229,10 +337,13 @@ local function open()
   local v = { win = win, buf = buf, root = root, show_closed = false, ids = {} }
   views[tab] = v
   v.release = require("beads.watch").acquire(root)
-  v.unsub = store.subscribe(root, function()
-    if views[tab] == v then
-      render(v)
+  v.unsub = store.subscribe(root, function(_, err)
+    if views[tab] ~= v then
+      return
     end
+    v.loaded = true
+    v.not_repo = err ~= nil and err:lower():find("no beads project", 1, true) ~= nil
+    render(v)
   end)
   setup_keys(v, tab)
   vim.api.nvim_create_autocmd({ "BufWipeout", "WinClosed" }, {

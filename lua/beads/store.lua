@@ -104,7 +104,7 @@ local function start(root, e, cbs)
     if not err then
       mark_waiting(root, e.state)
     end
-    do
+    local function finish()
       local trailing = e.trailing
       e.trailing = nil
       e.in_flight = false
@@ -118,6 +118,22 @@ local function start(root, e, cbs)
         cb(e.state, err)
       end
     end
+    if err then
+      finish()
+      return
+    end
+    -- The ready count is fetched inside the refresh (in_flight spans it) because bd ready
+    -- rewrites the Dolt manifest like bd list; the watcher must treat it as our own write.
+    local state = e.state
+    local p2 = cli.get_root_override()
+    cli.set_root(root)
+    cli.ready(function(r)
+      if not r.err and type(r.data) == "table" then
+        state.ready_n = #r.data
+      end
+      finish()
+    end)
+    cli.set_root(p2)
   end)
   cli.set_root(prev)
 end

@@ -159,6 +159,19 @@ local function bd_calls()
   return out
 end
 
+-- Data-changing bd calls only: background watcher refreshes (list/ready/show) may legitimately
+-- fire late from an earlier test and are not writes.
+local READ_SUBS = { list = true, ready = true, show = true, children = true, ["--version"] = true }
+local function bd_writes()
+  local out = {}
+  for _, argv in ipairs(bd_calls()) do
+    if not READ_SUBS[subcommand(argv) or ""] then
+      out[#out + 1] = argv
+    end
+  end
+  return out
+end
+
 local function wipe_beads_buffers()
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(b) and vim.startswith(vim.api.nvim_buf_get_name(b), "beads://") then
@@ -289,7 +302,7 @@ describe("beads create flow (beads://new)", function()
       pcall(vim.cmd.write)
       vim.wait(500)
 
-      assert.are.same({}, bd_calls(), "no bd process may be spawned for an empty title")
+      assert.are.same({}, bd_writes(), "no data-changing bd call may be made for an empty title")
       local errored = false
       for _, n in ipairs(notes) do
         if n.level == vim.log.levels.ERROR then
@@ -311,7 +324,7 @@ describe("beads create flow (beads://new)", function()
       vim.api.nvim_set_current_buf(buf)
       pcall(vim.cmd.write)
       vim.wait(500)
-      assert.are.same({}, bd_calls(), "no bd process may be spawned for a blank title")
+      assert.are.same({}, bd_writes(), "no data-changing bd call may be made for a blank title")
       assert.are.equal("beads://new", vim.api.nvim_buf_get_name(buf))
     end)
   end)
