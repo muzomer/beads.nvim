@@ -8,6 +8,7 @@ M.default_glyphs = {
   human = "👤",
   needs_review = "👀",
   parked = "⏸",
+  waiting = "💬",
 }
 
 local TASK_FIELDS = { "verdict", "review_round", "findings", "gate", "tdd", "bookmark", "change", "rounds", "parked" }
@@ -49,6 +50,9 @@ function M.badges(bead)
   end
   if meta.parked ~= nil then
     out[#out + 1] = g.parked
+  end
+  if bead.waiting_user then
+    out[#out + 1] = g.waiting
   end
   return out
 end

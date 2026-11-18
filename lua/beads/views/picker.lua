@@ -42,7 +42,17 @@ local function from_cli(fn, ...)
     if res.err then
       return cb(nil, res.err)
     end
-    cb(model.normalize_all(res.data))
+    local beads = model.normalize_all(res.data)
+    -- overlay waiting_user (not in cli output) from the store state
+    store.refresh(cli.get_root(), function(state)
+      for _, b in ipairs(beads) do
+        local sb = state and state.by_id and state.by_id[b.id]
+        if sb and sb.waiting_user then
+          b.waiting_user = true
+        end
+      end
+      cb(beads)
+    end)
   end)
   fn(unpack(args))
 end

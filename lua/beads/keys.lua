@@ -66,6 +66,7 @@ M.globals = {
   { "search", "<leader>bs", "search picker (prompts for the query)" },
   { "needs", "<leader>bn", "needs-me picker" },
   { "epics", "<leader>be", "epics picker" },
+  { "questions", "<leader>bq", "questions waiting on you" },
   { "create", "<leader>bc", "create a bead" },
   { "help", "<leader>b?", "keys that work here" },
 }
@@ -329,6 +330,9 @@ function M.setup_globals()
           require("beads.views.picker").open("search", q)
         end
       end)
+    end,
+    questions = function()
+      require("beads.views.questions").open()
     end,
     create = function()
       require("beads.views.detail").open_new()

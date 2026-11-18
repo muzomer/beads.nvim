@@ -1,7 +1,7 @@
 # beads.nvim
 
 Neovim front end for the [beads](https://github.com/steveyegge/beads) issue tracker (`bd`).
-Commands: `:Beads tree|ready|list|search|needs|epics|show <id>|create|cd <path>`.
+Commands: `:Beads tree|ready|list|search|needs|epics|questions|show <id>|create|cd <path>`.
 
 ## Keymaps
 
@@ -19,6 +19,7 @@ or `false` (disabled); `keymaps = false` creates no maps at all. Every map has a
 | `<leader>bs` | `search` | search picker (prompts for the query) |
 | `<leader>bn` | `needs` | needs-me picker |
 | `<leader>be` | `epics` | epics picker |
+| `<leader>bq` | `questions` | questions waiting on you |
 | `<leader>bc` | `create` | create a bead |
 | `<leader>b?` | `help` | the keys that work where you are |
 

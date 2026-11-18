@@ -69,6 +69,26 @@ function M.subscribe(root, fn)
   end
 end
 
+-- Sets b.waiting_user on non-closed beads with an open thread waiting on the user (stored threads
+-- plus human threads, derived from the beads already fetched: no extra bd call).
+local function mark_waiting(root, state)
+  local waiting = {}
+  local ok, threads = pcall(require("beads.questions.store").list, root, { needs = "user", status = "open" })
+  for _, t in ipairs(ok and threads or {}) do
+    waiting[t.bead] = true
+  end
+  local all = {}
+  for _, b in pairs(state.by_id) do
+    all[#all + 1] = b
+  end
+  for _, t in ipairs(require("beads.questions.human").from_beads(all)) do
+    waiting[t.bead] = true
+  end
+  for id, b in pairs(state.by_id) do
+    b.waiting_user = (waiting[id] and b.status ~= "closed") or nil
+  end
+end
+
 local function start(root, e, cbs)
   e.in_flight = true
   -- cli resolves the root synchronously when spawning; swap it just for that call.
@@ -81,17 +101,22 @@ local function start(root, e, cbs)
     else
       e.state = build_state(model.normalize_all(res.data))
     end
-    local trailing = e.trailing
-    e.trailing = nil
-    e.in_flight = false
-    if trailing then
-      start(root, e, trailing)
+    if not err then
+      mark_waiting(root, e.state)
     end
-    for _, s in ipairs(vim.list_slice(e.subs)) do
-      s.fn(e.state, err)
-    end
-    for _, cb in ipairs(cbs) do
-      cb(e.state, err)
+    do
+      local trailing = e.trailing
+      e.trailing = nil
+      e.in_flight = false
+      if trailing then
+        start(root, e, trailing)
+      end
+      for _, s in ipairs(vim.list_slice(e.subs)) do
+        s.fn(e.state, err)
+      end
+      for _, cb in ipairs(cbs) do
+        cb(e.state, err)
+      end
     end
   end)
   cli.set_root(prev)

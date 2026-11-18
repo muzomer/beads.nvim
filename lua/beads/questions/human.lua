@@ -43,27 +43,32 @@ local function latest_note(notes)
   return last
 end
 
+-- Human threads of already-fetched beads (those labelled 'human' with a note); no bd call.
+function M.from_beads(beads)
+  local threads = {}
+  for _, b in ipairs(beads) do
+    local body = vim.tbl_contains(b.labels or {}, "human") and latest_note(b.notes)
+    if body then
+      threads[#threads + 1] = {
+        id = "human:" .. b.id,
+        bead = b.id,
+        status = "open",
+        needs = "user",
+        readonly = true,
+        human = true,
+        messages = { { author = "agent", body = body } },
+      }
+    end
+  end
+  return threads
+end
+
 function M.list(root, cb)
   run(root, { "list", "--label", "human", "-n", "0", "--json" }, true, function(res)
     if res.err then
       return cb(res)
     end
-    local threads = {}
-    for _, b in ipairs(res.data or {}) do
-      local body = latest_note(b.notes)
-      if body then
-        threads[#threads + 1] = {
-          id = "human:" .. b.id,
-          bead = b.id,
-          status = "open",
-          needs = "user",
-          readonly = true,
-          human = true,
-          messages = { { author = "agent", body = body } },
-        }
-      end
-    end
-    cb({ data = threads })
+    cb({ data = M.from_beads(res.data or {}) })
   end)
 end
 

@@ -1,6 +1,6 @@
 local M = {}
 
-M.subcommands = { "tree", "ready", "list", "search", "needs", "epics", "show", "create", "cd" }
+M.subcommands = { "tree", "ready", "list", "search", "needs", "epics", "questions", "show", "create", "cd" }
 
 function M.run(args)
   local sub = args[1]
@@ -28,6 +28,10 @@ function M.run(args)
   end
   if sub == "tree" then
     require("beads.views.tree").toggle()
+    return
+  end
+  if sub == "questions" then
+    require("beads.views.questions").open()
     return
   end
   if sub == "create" then

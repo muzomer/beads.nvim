@@ -6,7 +6,7 @@
 --     keymaps.detail.view.claim     (default "C")   -- detail buffer, VIEW mode
 --   g? in a view opens a floating window listing the active keys of that view (lhs + description).
 --   Every buffer-local map the plugin sets carries a non-empty desc (which-key).
---   The only global keymaps are the documented normal-mode <leader>b{t,r,l,s,n,e,c,?} maps,
+--   The only global keymaps are the documented normal-mode <leader>b{t,r,l,s,n,e,q,c,?} maps,
 --   each with a desc; <leader>bd is never mapped.
 -- bd is a fake on PATH (tests/picker_fake.lua).
 
@@ -237,7 +237,7 @@ describe("beads keymaps", function()
     end
     table.sort(added)
     local want = {}
-    for _, k in ipairs({ "t", "r", "l", "s", "n", "e", "c", "?" }) do
+    for _, k in ipairs({ "t", "r", "l", "s", "n", "e", "q", "c", "?" }) do
       local m = vim.fn.maparg("<leader>b" .. k, "n", false, true)
       assert.is_true(next(m) ~= nil, "<leader>b" .. k .. " is not mapped")
       assert.is_true(m.buffer ~= 1, "<leader>b" .. k .. " is buffer-local, not global")
