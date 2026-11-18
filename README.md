@@ -74,3 +74,15 @@ the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` c
 ### fzf-lua picker
 
 `keymaps.picker.*`: `<CR>` open, `ctrl-y` (`yank_id`), `alt-r` (`yank_run`), `ctrl-x` (`close`).
+
+## Highlights and glyphs
+
+All colours come from `Beads*` highlight groups (`BeadsId`, `BeadsTitle`, `BeadsDim`,
+`BeadsStatus{Open,InProgress,Blocked,Closed,Deferred}`, `BeadsPriority0..4`, `BeadsType{Epic,Bug,Feature,Task,Chore}`,
+`BeadsBadge{User,Agent}`, `BeadsBlocked`, `BeadsCurrent`, `BeadsFlash`, `BeadsFold`, `BeadsGuide`, `BeadsHeader`,
+`BeadsWinbar*`, `BeadsMode{View,Edit}`). They are defined with `default = true` as links to standard groups,
+re-applied on `ColorScheme`; override any with `:hi` or `:hi! link`.
+
+`glyphs` sets the status glyphs (defaults `○ ◐ ● ✓ ❄` for open, in_progress, blocked, closed, deferred):
+`setup({ glyphs = { open = "O" } })` overrides single ones; `setup({ glyphs = "ascii" })` uses plain ASCII
+`o ~ x v z`. `type_icons = { epic = "E", bug = "B", ... }` enables optional type icons (off by default).

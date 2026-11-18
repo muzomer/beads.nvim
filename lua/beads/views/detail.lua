@@ -10,7 +10,7 @@ local M = {}
 local ns = vim.api.nvim_create_namespace("beads_detail")
 local state = {} -- buf -> { bead, root }
 
-vim.api.nvim_set_hl(0, "BeadsReadonly", { link = "Comment", default = true })
+require("beads.highlights").apply()
 
 function M.snapshot(buf)
   return state[buf] and state[buf].bead
@@ -398,7 +398,7 @@ function M.refresh_threads(buf, cb)
       vim.api.nvim_buf_set_lines(buf, from, -1, false, tail)
       vim.bo[buf].modifiable = was
       for row = from, from + #tail - 1 do
-        vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { line_hl_group = "BeadsReadonly" })
+        vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { line_hl_group = "BeadsDim" })
       end
     end
     if cb then
@@ -472,7 +472,7 @@ apply = function(buf, bead)
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   for _, r in ipairs(regions) do
     for row = r.first - 1, r.last - 1 do
-      vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { line_hl_group = "BeadsReadonly" })
+      vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { line_hl_group = "BeadsDim" })
     end
   end
 end

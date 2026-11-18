@@ -4,6 +4,8 @@ M.defaults = {
   tree = { width = 50 },
   keymaps = require("beads.keys").default_map(), -- key, list of keys or false; false disables all
   fzf = "auto",
+  glyphs = {}, -- { open, in_progress, blocked, closed, deferred } overrides, or "ascii"
+  type_icons = false, -- or { epic = "", bug = "", feature = "", task = "", chore = "" }
 }
 
 M.config = vim.deepcopy(M.defaults)
@@ -37,6 +39,7 @@ function M.setup(opts)
     M.config.fzf = pcall(require, "fzf-lua")
   end
   keys.setup_globals()
+  require("beads.highlights").setup()
   return M
 end
 
