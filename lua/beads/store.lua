@@ -100,6 +100,7 @@ local function start(root, e, cbs)
       err = res.err
     else
       e.state = build_state(model.normalize_all(res.data))
+      e.loaded = true
     end
     if not err then
       mark_waiting(root, e.state)
@@ -148,6 +149,11 @@ function M.refresh(root, cb)
     return
   end
   start(root, e, cbs)
+end
+
+-- true once a refresh for this root has succeeded.
+function M.is_loaded(root)
+  return entry(root).loaded == true
 end
 
 function M.is_refreshing(root)

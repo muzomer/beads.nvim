@@ -158,6 +158,61 @@ local function view_actions(buf)
   end
   acts.next_waiting = jump(1)
   acts.prev_waiting = jump(-1)
+  local function step(dir)
+    local function go(st, count)
+      local order = require("beads.views.tree").order(st.root)
+      local idx
+      for i, id in ipairs(order) do
+        if id == st.bead.id then
+          idx = i
+        end
+      end
+      local target = idx and order[idx + dir * math.max(count, 1)]
+      if not target then
+        if dir > 0 then
+          vim.notify("Beads: no next bead", vim.log.levels.INFO)
+        else
+          vim.notify("Beads: no previous bead", vim.log.levels.INFO)
+        end
+        return
+      end
+      M.edit(target, st.root)
+      -- flash once the new bead has loaded (the load replaces the buffer lines asynchronously)
+      local win, nbuf, tries = vim.api.nvim_get_current_win(), vim.api.nvim_get_current_buf(), 0
+      local function flash_when_loaded()
+        tries = tries + 1
+        if not (vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == nbuf) then
+          return
+        end
+        local loaded = state[nbuf] and state[nbuf].bead and state[nbuf].bead.id == target
+        if loaded or tries > 100 then
+          require("beads.flash").flash(win)
+        else
+          vim.defer_fn(flash_when_loaded, 20)
+        end
+      end
+      flash_when_loaded()
+    end
+    return function()
+      local st = state[buf]
+      if not (st and st.bead) then
+        return
+      end
+      local store = require("beads.store")
+      if store.is_loaded(st.root) then
+        go(st, vim.v.count1)
+        return
+      end
+      local n = vim.v.count1
+      store.refresh(st.root, function()
+        if state[buf] == st and vim.api.nvim_buf_is_valid(buf) then
+          go(st, n)
+        end
+      end)
+    end
+  end
+  acts.next_bead = step(1)
+  acts.prev_bead = step(-1)
   acts.edit = function()
     M.enter_edit(buf)
   end

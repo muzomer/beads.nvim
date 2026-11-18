@@ -39,6 +39,7 @@ returns the mode for a statusline.
 | `C` | `claim` | claim |
 | `<CR>` | `open_thread` | open the question thread under the cursor (`## Questions`) |
 | `]u`, `[u` | `next_waiting`, `prev_waiting` | jump to the next / previous thread waiting for you |
+| `]b`, `[b` | `next_bead`, `prev_bead` | open the next / previous bead in tree order in this window (a count works; follows the open tree's sort, filter and `H`) |
 | `n` | `note` | append a note (float) |
 | `c` | `comment` | add a comment (float) |
 | `a` | `ask` | ask a question about the section under the cursor (or the visual selection) |

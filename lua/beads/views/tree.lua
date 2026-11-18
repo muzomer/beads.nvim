@@ -162,6 +162,27 @@ local function build_lines(v, st)
   return lines, ids, marks, folds
 end
 
+-- Bead ids of `root` in the order the tree shows them (depth-first, folds ignored). Uses the open
+-- tree's sort, filter and closed visibility for that root; otherwise default sort, no filter, closed hidden.
+function M.order(root)
+  local v = views[vim.api.nvim_get_current_tabpage()]
+  local ids
+  if v and v.root == root and v.ids and vim.api.nvim_win_is_valid(v.win) then
+    ids = v.ids
+  else
+    local _
+    _, ids = build_lines({ show_closed = false, root = root }, store.get(root))
+  end
+  local out, last = {}, 0
+  for r in pairs(ids) do
+    last = math.max(last, r)
+  end
+  for r = 1, last do
+    out[#out + 1] = ids[r]
+  end
+  return out
+end
+
 local function header_text(v, st)
   local open, need = 0, 0
   for _, b in pairs(st.by_id) do

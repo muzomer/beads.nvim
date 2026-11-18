@@ -27,6 +27,8 @@ M.defaults = {
     { "open_thread", "<CR>", "open the question thread under the cursor" },
     { "next_waiting", "]u", "next thread waiting for you" },
     { "prev_waiting", "[u", "previous thread waiting for you" },
+    { "next_bead", "]b", "next bead in tree order (count ok)" },
+    { "prev_bead", "[b", "previous bead in tree order (count ok)" },
     { "ask", "a", "ask a question about the section / selection" },
     { "note", "n", "append a note (float)" },
     { "comment", "c", "add a comment (float)" },
