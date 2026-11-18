@@ -354,27 +354,56 @@ function M.ask(buf)
     row = vim.api.nvim_win_get_cursor(0)[1]
   end
   local section = section_at(buf, row)
-  vim.ui.input({ prompt = "Question: " }, function(text)
-    text = text and vim.trim(text)
-    if not text or text == "" then
-      return
-    end
-    local ok, thread = pcall(require("beads.questions.store").add, root, {
-      bead = bead.id,
-      section = section,
-      quote = quote,
-      messages = { { author = "user", body = text } },
-    })
-    if not ok or not thread then
-      vim.notify("Beads: could not store the question: " .. tostring(thread), vim.log.levels.ERROR)
-      return
-    end
-    local lines = vim.api.nvim_buf_is_valid(buf) and (render.render(bead)) or {}
-    workflow.deliver(root, build_prompt(root, bead, thread, lines), "question stored.")
-    if vim.api.nvim_buf_is_valid(buf) then
+  local title = "Ask " .. bead.id
+  if quote then
+    local q = vim.split(quote, "\n", { plain = true })[1]
+    title = title .. ' "' .. (#q > 40 and q:sub(1, 40) .. "..." or q) .. '"'
+  elseif section then
+    title = title .. " (" .. section .. ")"
+  end
+  require("beads.views.input").open({
+    title = title,
+    on_submit = function(text, send)
+      local ok, thread = pcall(require("beads.questions.store").add, root, {
+        bead = bead.id,
+        section = section,
+        quote = quote,
+        messages = { { author = "user", body = text } },
+      })
+      if not ok or not thread then
+        vim.notify("Beads: could not store the question: " .. tostring(thread), vim.log.levels.ERROR)
+        return
+      end
+      if send then
+        local lines = vim.api.nvim_buf_is_valid(buf) and (render.render(bead)) or {}
+        workflow.deliver(root, build_prompt(root, bead, thread, lines), "question stored.")
+      end
+      if not vim.api.nvim_buf_is_valid(buf) then
+        return
+      end
+      M.refresh_threads(buf, function()
+        local cfg = require("beads").config.ask or {}
+        if cfg.open_after_send == false then
+          return
+        end
+        local cur = state[buf]
+        for i, t in ipairs(cur and cur.bead and cur.bead.threads or {}) do
+          if t.id == thread.id then
+            return require("beads.views.thread").open(buf, i)
+          end
+        end
+      end)
+    end,
+  })
+end
+
+-- Re-reads the threads of every open detail buffer of `root` (a questions.json change).
+function M.refresh_root_threads(root)
+  for buf, st in pairs(state) do
+    if st.root == root and st.bead and vim.api.nvim_buf_is_valid(buf) then
       M.refresh_threads(buf)
     end
-  end)
+  end
 end
 
 -- Line number of the "## Questions" heading in the buffer, or nil.
@@ -446,6 +475,7 @@ function M.refresh_threads(buf, cb)
         vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { line_hl_group = "BeadsDim" })
       end
     end
+    vim.api.nvim_exec_autocmds("User", { pattern = "BeadsThreadsRefreshed", data = buf, modeline = false })
     if cb then
       cb()
     end

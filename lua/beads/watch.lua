@@ -208,6 +208,11 @@ local function stop(root, st)
   st.timer = nil
   close_handle(st.notify_timer)
   st.notify_timer = nil
+  close_handle(st.qtimer)
+  st.qtimer = nil
+  close_handle(st.qnotify_timer)
+  st.qnotify_timer = nil
+  st.replies = nil
   st.changed = nil
   if st.unsub then
     st.unsub()
@@ -240,12 +245,124 @@ local function detect(root, st)
   cli.set_root(prev)
 end
 
+-- Questions watcher: <root>/.beads-nvim/questions.json is written by beads-ask (another process).
+local function qsnapshot(root)
+  local snap = {}
+  local ok, threads = pcall(require("beads.questions.store").list, root)
+  for _, t in ipairs(ok and threads or {}) do
+    snap[t.id] = #(t.messages or {})
+  end
+  return snap
+end
+
+local function flush_replies(st)
+  close_handle(st.qnotify_timer)
+  st.qnotify_timer = nil
+  local list = st.replies or {}
+  st.replies = nil
+  if st.stopped or #list == 0 then
+    return
+  end
+  if #list == 1 then
+    vim.notify("Beads: agent replied on " .. list[1].bead .. ": " .. list[1].line, vim.log.levels.INFO)
+    return
+  end
+  local ids, lines = {}, {}
+  for _, r in ipairs(list) do
+    if not vim.tbl_contains(ids, r.bead) then
+      ids[#ids + 1] = r.bead
+    end
+    lines[#lines + 1] = ("  %s: %s"):format(r.bead, r.line)
+  end
+  vim.notify(
+    "Beads: agent replied on " .. table.concat(ids, ", ") .. "\n" .. table.concat(lines, "\n"),
+    vim.log.levels.INFO
+  )
+end
+
+local function qfire(root, st)
+  if st.stopped then
+    return
+  end
+  local ok, threads = pcall(require("beads.questions.store").list, root)
+  local old, new = st.qsnap or {}, {}
+  local cfg = require("beads").config
+  for _, t in ipairs(ok and threads or {}) do
+    local msgs = t.messages or {}
+    new[t.id] = #msgs
+    local known = old[t.id] or math.min(1, #msgs) -- a new thread's first message is its opener
+    for i = known + 1, #msgs do
+      if msgs[i].author ~= "user" and cfg.notify ~= false then
+        st.replies = st.replies or {}
+        local line = vim.split(msgs[i].body or "", "\n", { plain = true })[1] or ""
+        st.replies[#st.replies + 1] = { bead = t.bead, line = line }
+      end
+    end
+  end
+  st.qsnap = new
+  if st.replies and not st.qnotify_timer then
+    st.qnotify_timer = vim.uv.new_timer()
+    st.qnotify_timer:start(cfg.notify_group_ms or 1500, 0, function()
+      vim.schedule(function()
+        flush_replies(st)
+      end)
+    end)
+  end
+  store.refresh(root, function()
+    if not st.stopped then
+      require("beads.views.detail").refresh_root_threads(root)
+    end
+  end)
+end
+
+local function start_questions(root, st)
+  st.qsnap = qsnapshot(root)
+  local dir = root .. "/.beads-nvim"
+  if vim.fn.isdirectory(dir) == 0 then
+    vim.fn.mkdir(dir, "p")
+    local f = io.open(dir .. "/.gitignore", "w")
+    if f then
+      f:write("*\n")
+      f:close()
+    end
+  end
+  local h = vim.uv.new_fs_event()
+  if not h then
+    return
+  end
+  local ok = h:start(dir, {}, function(err, name)
+    if err or name ~= "questions.json" then
+      return
+    end
+    vim.schedule(function()
+      if st.stopped then
+        return
+      end
+      if not st.qtimer then
+        st.qtimer = vim.uv.new_timer()
+      end
+      st.qtimer:stop()
+      st.qtimer:start(DEBOUNCE_MS, 0, function()
+        vim.schedule(function()
+          qfire(root, st)
+        end)
+      end)
+    end)
+  end)
+  if ok == nil or ok < 0 then
+    close_handle(h)
+    return
+  end
+  st.handles[#st.handles + 1] = h
+end
+
 -- Call when a beads view opens; returns release(), to call when it closes.
 function M.acquire(root)
   local st = roots[root]
   if not st then
     st = { count = 0, handles = {}, stopped = false, quiet_until = 0 }
     roots[root] = st
+    start_questions(root, st)
     detect(root, st)
   end
   st.count = st.count + 1

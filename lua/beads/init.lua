@@ -9,6 +9,7 @@ M.defaults = {
   flash_ms = 350, -- jump flash duration in ms; false disables
   notify = true, -- false silences the grouped "changed externally" notifications
   notify_group_ms = 1500, -- external changes within this window are reported in one notification
+  ask = { open_after_send = true }, -- open the new thread's float after saving a question
   type_icons = false, -- or { epic = "", bug = "", feature = "", task = "", chore = "" }
 }
 

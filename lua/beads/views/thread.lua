@@ -100,25 +100,25 @@ function M.open(dbuf, idx)
     if not t then
       return
     end
-    vim.ui.input({ prompt = "Reply: " }, function(text)
-      if not text or vim.trim(text) == "" then
-        return
-      end
-      if t.human then
-        human.answer(root, t.bead, text, function(res)
-          if res.err then
-            fail(res.err)
+    require("beads.views.input").open({
+      title = "Reply " .. t.bead .. " " .. t.id,
+      on_submit = function(text)
+        if t.human then
+          human.answer(root, t.bead, text, function(res)
+            if res.err then
+              fail(res.err)
+            end
+            refresh()
+          end)
+        else
+          local ok, err = pcall(qstore.reply, root, t.id, "user", text)
+          if not ok then
+            fail(tostring(err))
           end
           refresh()
-        end)
-      else
-        local ok, err = pcall(qstore.reply, root, t.id, "user", text)
-        if not ok then
-          fail(tostring(err))
         end
-        refresh()
-      end
-    end)
+      end,
+    })
   end
   acts.resolve = function()
     local t = current()
@@ -180,6 +180,17 @@ function M.open(dbuf, idx)
     require("beads.views.peek").at_cursor(root)
   end
   keys.bind(fbuf, "thread", acts)
+  vim.api.nvim_create_autocmd("User", {
+    pattern = "BeadsThreadsRefreshed",
+    callback = function(a)
+      if not vim.api.nvim_buf_is_valid(fbuf) then
+        return true
+      end
+      if a.data == dbuf then
+        render()
+      end
+    end,
+  })
   render()
 end
 

@@ -2,10 +2,11 @@
 -- Interface under test:
 --   * VIEW mode key keymaps.detail.view.ask (default "a"), buffer-local in normal mode (section
 --     under the cursor) and visual mode (the selected text becomes the thread's quote).
---   * It asks for the question (an input float submitted with keymaps.input.submit <C-s>, or
---     vim.ui.input; both are handled here). A non-empty question stores a thread through
---     beads.questions.store ({ bead, section, quote, messages = { { author = "user", body } } })
---     and calls require("agent-poke").poke(root, prompt[, opts]).
+--   * It asks for the question in the ask box (bead beads_nvim-tch: a floating input box, never
+--     vim.ui.input). <C-s> saves; <M-s> (keymaps.input.send) saves and sends. A non-empty question
+--     stores a thread through beads.questions.store
+--     ({ bead, section, quote, messages = { { author = "user", body } } }); sending calls
+--     require("agent-poke").poke(root, prompt[, opts]).
 --   * agent-poke.nvim is stubbed through package.preload (prompt captured). When it cannot be
 --     required the thread is still stored and the user is notified how to deliver it.
 --   * agent-poke is required at ask time (not cached at setup or module load).
@@ -47,22 +48,21 @@ local function line_of(buf, text)
   error("no line '" .. text .. "' in the detail buffer")
 end
 
--- Presses keys in the detail window and answers the question prompt with text, whether it is
--- asked through vim.ui.input or an input float (filled, then submitted with <C-s>).
-local function ask(keys, text)
+-- Presses keys in the detail window and answers in the ask box (filled, then submitted with
+-- submit: "<C-s>" saves, "<M-s>" saves and sends; default "<M-s>"). vim.ui.input must not be used.
+local function ask(keys, text, submit)
   local asked = false
   vim.ui.input = function(_, cb)
     asked = true
-    cb(text)
+    cb(nil)
   end
   local f = fake.press_for_float(keys)
-  if not asked and f then
-    vim.api.nvim_set_current_win(f)
-    local b = vim.api.nvim_win_get_buf(f)
-    vim.api.nvim_buf_set_lines(b, 0, -1, false, vim.split(text, "\n", { plain = true }))
-    fake.press("<C-s>")
-  end
-  assert(asked or f ~= nil, "pressing " .. keys .. " asked for no question")
+  assert(not asked, "pressing " .. keys .. " used vim.ui.input instead of the ask box")
+  assert(f ~= nil, "pressing " .. keys .. " opened no ask box")
+  vim.api.nvim_set_current_win(f)
+  local b = vim.api.nvim_win_get_buf(f)
+  vim.api.nvim_buf_set_lines(b, 0, -1, false, vim.split(text, "\n", { plain = true }))
+  fake.press(submit or "<M-s>")
 end
 
 local function threads()

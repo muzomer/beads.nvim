@@ -67,6 +67,7 @@ M.defaults = {
   input = {
     { "submit", "<C-s>", "submit (normal and insert)" },
     { "submit_normal", "<CR>", "submit (normal)" },
+    { "send", "<M-s>", "save and send to the agent (normal and insert)" },
     { "cancel", { "q", "<Esc>" }, "cancel (normal)" },
   },
   picker = {
@@ -340,7 +341,7 @@ function M.unbind(buf, set)
 end
 
 -- Input float maps: submit (n+i), submit_normal (n), cancel (n).
-function M.bind_input(buf, submit, cancel)
+function M.bind_input(buf, submit, cancel, send)
   vim.b[buf].beads_group = "input"
   for _, k in ipairs(M.resolve("input")) do
     for _, lhs in ipairs(k[2]) do
@@ -353,6 +354,14 @@ function M.bind_input(buf, submit, cancel)
         end, o)
       elseif k[1] == "submit_normal" then
         vim.keymap.set("n", lhs, submit, o)
+      elseif k[1] == "send" then
+        if send then
+          vim.keymap.set("n", lhs, send, o)
+          vim.keymap.set("i", lhs, function()
+            vim.cmd("stopinsert")
+            send()
+          end, o)
+        end
       elseif k[1] == "cancel" then
         vim.keymap.set("n", lhs, cancel, o)
       end

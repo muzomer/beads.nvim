@@ -75,10 +75,19 @@ the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` c
 `keymaps.tree_view.*`: `<CR>` open, `a` add child, `x` close, `C` claim, `R` refresh, `H` toggle closed, `L` cycle the layout (left, bottom, right, top), `f` filter (free text plus `status:`, `label:`, `assignee:`, `type:` tokens; empty clears), `s` cycle the sort (priority, updated, id),
 `gd` peek, `yy` yank id, `yr` yank run command, `q` close, `?` / `g?` help, `za`/`zo`/`zc` fold.
 
-### Input floats (note, comment)
+### Input floats (ask, reply, note, comment)
 
-`keymaps.input.*`: `<C-s>` submit (normal and insert, `submit`), `<CR>` submit (normal,
-`submit_normal`), `q` and `<Esc>` cancel (normal, `cancel`).
+`a` in detail VIEW mode (and `r` in a thread float) opens a multi-line ask box titled with the bead id
+and the section or quote. `keymaps.input.*`: `<C-s>` save (normal and insert, `submit`), `<CR>` save
+(normal, `submit_normal`), `<M-s>` save and send to the agent (`send`; without agent-poke the prompt is
+copied), `q` and `<Esc>` cancel (normal, `cancel`). Empty text saves nothing.
+
+`setup({ ask = { open_after_send = true } })` opens the new thread's float after every save (`false`
+keeps the detail buffer focused).
+
+Replies written by `beads-ask reply` appear live: while a beads view is open, `.beads-nvim/questions.json`
+is watched and the Questions section, thread floats and badges refresh. Each agent reply notifies
+`Beads: agent replied on <bead id>: <first line>` (grouped within `notify_group_ms`, silenced by `notify = false`).
 
 ### fzf-lua picker
 
