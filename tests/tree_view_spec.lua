@@ -1,6 +1,6 @@
 -- Interface under test (bead beads_nvim-ge7.12): lua/beads/views/tree.lua via :Beads tree
 --   :Beads tree toggles a left vsplit tree (width from require("beads").config.tree.width,
---   default 50), one per tabpage. The tree reads require("beads.store") for cli.get_root()
+--   default since beads_nvim-4u9.5: a quarter of the screen clamped 24..42, so 42 at 200 columns), one per tabpage. The tree reads require("beads.store") for cli.get_root()
 --   and re-renders on store notifications.
 --   Lines: indent by parent-child depth, id, priority, status, title, workflow badges,
 --   "⛔ blocked by X" markers for open blockers. Closed beads hidden until H.
@@ -189,13 +189,13 @@ describe(":Beads tree", function()
     vim.o.columns = orig_columns
   end)
 
-  it("toggles one left tree window of width 50: second :Beads tree closes it", function()
+  it("toggles one left tree window of width 42 (200 columns): second :Beads tree closes it", function()
     local n = #wins()
     local tree = open_tree()
     assert.is_not_nil(tree, ":Beads tree opened no window")
     assert.are.equal(n + 1, #wins())
     assert.are.equal(1, vim.fn.win_screenpos(tree)[2], "tree window is not at the left edge")
-    assert.are.equal(50, vim.api.nvim_win_get_width(tree))
+    assert.are.equal(42, vim.api.nvim_win_get_width(tree))
     assert(wait_for(tree, "ep-a"), "tree never rendered:\n" .. dump(tree))
     vim.cmd("Beads tree")
     assert.is_false(vim.api.nvim_win_is_valid(tree), "second :Beads tree did not close the tree window")

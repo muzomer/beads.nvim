@@ -64,7 +64,7 @@ function M.run(args)
     return
   end
   if sub == "tree" then
-    require("beads.views.tree").toggle()
+    require("beads.views.tree").toggle(args[2])
     return
   end
   if sub == "questions" then

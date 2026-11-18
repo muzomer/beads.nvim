@@ -1,7 +1,7 @@
 # beads.nvim
 
 Neovim front end for the [beads](https://github.com/steveyegge/beads) issue tracker (`bd`).
-Commands: `:Beads tree|ready|list|search|needs|epics|questions|show <id>|create|cd <path>|poke [pick]|output|chat`.
+Commands: `:Beads tree [left|right|bottom|top]|ready|list|search|needs|epics|questions|show <id>|create|cd <path>|poke [pick]|output|chat`.
 `poke`, `output` and `chat` pass through to [agent-poke.nvim](https://github.com/momer/agent-poke.nvim)
 (a hint is shown when it is not installed); `poke` resends the threads waiting on the agent, `poke pick` chooses a target.
 
@@ -63,7 +63,7 @@ the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` c
 
 ### Tree
 
-`keymaps.tree_view.*`: `<CR>` open, `a` add child, `x` close, `C` claim, `R` refresh, `H` toggle closed,
+`keymaps.tree_view.*`: `<CR>` open, `a` add child, `x` close, `C` claim, `R` refresh, `H` toggle closed, `L` cycle the layout (left, bottom, right, top),
 `yy` yank id, `yr` yank run command, `q` close, `?` / `g?` help, `za`/`zo`/`zc` fold.
 
 ### Input floats (note, comment)

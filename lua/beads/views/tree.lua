@@ -396,26 +396,51 @@ local function setup_keys(v, tab)
       vim.fn.setreg('"', workflow.run_command(b))
     end
   end))
+  map("layout", function()
+    M.cycle(tab)
+  end)
   map("close", function()
     close(tab)
   end)
   keys.bind(v.buf, "tree_view", acts)
 end
 
-local function open()
+local POSITIONS = { "left", "bottom", "right", "top" } -- the L cycle order
+local last_position -- remembered for the session
+
+local function clamp(n, lo, hi)
+  return math.max(lo, math.min(hi, n))
+end
+
+-- Sizes the tree window for `pos` (explicit config width/height, else the clamped screen fraction).
+local function apply_layout(win, pos)
+  local cfg = require("beads").config.tree or {}
+  if pos == "left" or pos == "right" then
+    vim.wo[win].winfixheight = false
+    vim.api.nvim_win_set_width(win, cfg.width or clamp(math.floor(vim.o.columns / 4), 24, 42))
+    vim.wo[win].winfixwidth = true
+  else
+    vim.wo[win].winfixwidth = false
+    vim.api.nvim_win_set_height(win, cfg.height or clamp(math.floor(vim.o.lines * 0.3), 6, 15))
+    vim.wo[win].winfixheight = true
+  end
+end
+
+local SPLIT = { left = "topleft vsplit", right = "botright vsplit", bottom = "botright split", top = "topleft split" }
+local WINCMD = { left = "H", right = "L", bottom = "J", top = "K" }
+
+local function open(pos)
   local tab = vim.api.nvim_get_current_tabpage()
   local root = cli.get_root()
-  local width = (require("beads").config.tree or {}).width or 50
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "wipe"
   vim.bo[buf].swapfile = false
   vim.bo[buf].filetype = "beads-tree"
-  vim.cmd("topleft vsplit")
+  vim.cmd(SPLIT[pos])
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, buf)
-  vim.api.nvim_win_set_width(win, width)
-  vim.wo[win].winfixwidth = true
+  apply_layout(win, pos)
   vim.wo[win].wrap = false
   vim.wo[win].number = false
   vim.wo[win].relativenumber = false
@@ -425,7 +450,7 @@ local function open()
   vim.wo[win].foldtext = "v:lua.require'beads.views.tree'.foldtext()"
   vim.wo[win].foldlevel = 99
   vim.bo[buf].shiftwidth = 2
-  local v = { win = win, buf = buf, root = root, show_closed = false, ids = {}, closed = {} }
+  local v = { win = win, buf = buf, pos = pos, root = root, show_closed = false, ids = {}, closed = {} }
   views[tab] = v
   v.release = require("beads.watch").acquire(root)
   v.unsub = store.subscribe(root, function(_, err)
@@ -453,17 +478,62 @@ local function open()
   store.refresh(root)
 end
 
-function M.toggle()
+local function resolve(pos)
+  if pos and not vim.tbl_contains(POSITIONS, pos) then
+    vim.notify("Beads: tree position must be left, right, bottom or top", vim.log.levels.ERROR)
+    return nil
+  end
+  return pos or last_position or (require("beads").config.tree or {}).position or "left"
+end
+
+-- Moves the open tree window of `tab` to `pos`, keeping window, buffer, folds, cursor and watcher.
+local function move(v, pos)
+  if v.pos ~= pos then
+    vim.api.nvim_win_call(v.win, function()
+      vim.cmd("wincmd " .. WINCMD[pos])
+    end)
+    v.pos = pos
+  end
+  apply_layout(v.win, pos)
+end
+
+-- M.toggle(): toggle, opening at the last / configured position.
+-- M.toggle(pos): open the tree at pos, or move an open tree there.
+function M.toggle(pos)
   local tab = vim.api.nvim_get_current_tabpage()
   local v = views[tab]
-  if v and vim.api.nvim_win_is_valid(v.win) then
+  local live = v and vim.api.nvim_win_is_valid(v.win)
+  if pos == nil and live then
     close(tab)
-  else
-    if v then
-      close(tab)
-    end
-    open()
+    return
   end
+  pos = resolve(pos)
+  if not pos then
+    return
+  end
+  last_position = pos
+  if live then
+    move(v, pos)
+    return
+  end
+  if v then
+    close(tab)
+  end
+  open(pos)
+end
+
+function M.cycle(tab)
+  local v = views[tab]
+  if not (v and vim.api.nvim_win_is_valid(v.win)) then
+    return
+  end
+  local idx = 1
+  for i, p in ipairs(POSITIONS) do
+    if p == v.pos then
+      idx = i
+    end
+  end
+  M.toggle(POSITIONS[idx % #POSITIONS + 1])
 end
 
 return M

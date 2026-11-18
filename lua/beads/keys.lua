@@ -12,6 +12,7 @@ M.defaults = {
     { "refresh", "R", "refresh" },
     { "toggle_closed", "H", "toggle closed beads" },
     { "fold", "<Tab>", "toggle fold" },
+    { "layout", "L", "cycle layout: left, bottom, right, top" },
     { "yank_id", "yy", "yank bead id" },
     { "yank_run", "yr", "yank workflow run command" },
     { "close", "q", "close tree" },

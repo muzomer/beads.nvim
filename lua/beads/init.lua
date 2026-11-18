@@ -1,7 +1,7 @@
 local M = {}
 
 M.defaults = {
-  tree = { width = 50 },
+  tree = { position = "left", width = nil, height = nil }, -- width/height: computed at open
   keymaps = require("beads.keys").default_map(), -- key, list of keys or false; false disables all
   fzf = "auto",
   glyphs = {}, -- { open, in_progress, blocked, closed, deferred } overrides, or "ascii"
