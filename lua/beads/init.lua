@@ -53,4 +53,27 @@ function M.mode()
   return vim.b.beads_mode or ""
 end
 
+-- Short statusline text from the store of the current root; never spawns bd.
+function M.status()
+  local g = require("beads.glyphs")
+  local state = require("beads.store").get(require("beads.cli").get_root())
+  local ip, waiting = 0, 0
+  for _, b in pairs(state.by_id) do
+    if b.status == "in_progress" then
+      ip = ip + 1
+    end
+    if b.waiting_user then
+      waiting = waiting + 1
+    end
+  end
+  return ("%s %d  %s %d ready  💬 %d"):format(g.status("in_progress"), ip, g.status("open"), state.ready_n or 0, waiting)
+end
+
+-- lualine component: lualine_x = { require("beads").lualine }
+M.lualine = {
+  function()
+    return M.status()
+  end,
+}
+
 return M

@@ -76,6 +76,17 @@ the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` c
 
 `keymaps.picker.*`: `<CR>` open, `ctrl-y` (`yank_id`), `alt-r` (`yank_run`), `ctrl-x` (`close`).
 
+## Statusline
+
+`require("beads").status()` returns a short string such as `◐ 2  ○ 5 ready  💬 1`
+(in progress, ready, waiting on you), read from the cached store (it never spawns `bd`).
+`◐` counts every in-progress bead, including those waiting on you, which also count under `💬`.
+For lualine:
+
+```lua
+lualine_x = { require("beads").lualine }
+```
+
 ## Highlights and glyphs
 
 All colours come from `Beads*` highlight groups (`BeadsId`, `BeadsTitle`, `BeadsDim`,

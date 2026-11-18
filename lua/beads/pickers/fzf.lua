@@ -48,8 +48,9 @@ function M.pick(source, beads, picker, release)
       actions[key] = handlers[action]
     end
   end
-  picker.fzf_exec(lines, {
+  local opts = {
     prompt = "Beads " .. source .. "> ",
+    header = M.header(),
     preview = function(selected)
       local _, b = first(selected)
       if not b then
@@ -58,7 +59,41 @@ function M.pick(source, beads, picker, release)
       return table.concat(render.render(b), "\n")
     end,
     actions = actions,
-  }, release)
+  }
+  local ok, builtin = pcall(require, "fzf-lua.previewer.builtin")
+  if ok and type(builtin) == "table" and builtin.base then
+    opts.previewer = M.previewer_class(builtin.base, function(line)
+      local _, b = first({ line })
+      return b
+    end)
+  end
+  picker.fzf_exec(lines, opts, release)
+end
+
+-- Header listing the active picker action keys (disabled actions omitted).
+function M.header()
+  local parts = { "<CR> open" }
+  for _, k in ipairs(require("beads.keys").resolve("picker")) do
+    parts[#parts + 1] = k[2][1] .. " " .. k[3]
+  end
+  return table.concat(parts, "  |  ")
+end
+
+-- fzf-lua builtin previewer showing the rendered bead with markdown highlighting.
+function M.previewer_class(base, bead_of)
+  local P = base:extend()
+  function P:new(o, opts, fzf_win)
+    base.new(self, o, opts, fzf_win)
+    return self
+  end
+  function P:populate_preview_buf(entry_str)
+    local b = bead_of(entry_str)
+    local buf = self:get_tmp_buffer()
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, b and render.render(b) or {})
+    vim.bo[buf].filetype = "markdown"
+    self:set_preview_buf(buf)
+  end
+  return P
 end
 
 return M
