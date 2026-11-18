@@ -89,6 +89,7 @@ end
 
 function M.open_bead(id)
   vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
+  require("beads.flash").flash()
 end
 
 function M.close_bead(id)

@@ -5,6 +5,7 @@ M.defaults = {
   keymaps = require("beads.keys").default_map(), -- key, list of keys or false; false disables all
   fzf = "auto",
   glyphs = {}, -- { open, in_progress, blocked, closed, deferred } overrides, or "ascii"
+  flash_ms = 350, -- jump flash duration in ms; false disables
   type_icons = false, -- or { epic = "", bug = "", feature = "", task = "", chore = "" }
 }
 
@@ -40,6 +41,7 @@ function M.setup(opts)
   end
   keys.setup_globals()
   require("beads.highlights").setup()
+  require("beads.views.tree").setup_current()
   return M
 end
 

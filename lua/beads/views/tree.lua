@@ -7,6 +7,8 @@ local keys = require("beads.keys")
 local M = {}
 
 local NS = vim.api.nvim_create_namespace("beads_tree")
+local CUR_NS = vim.api.nvim_create_namespace("beads_tree_current")
+local current = {} -- { id, buf } of the most recent beads://<id> detail buffer
 
 local views = {} -- tabpage -> { win, buf, root, show_closed, ids, unsub, release }
 
@@ -216,6 +218,43 @@ local function restore_folds(v)
   end)
 end
 
+local function row_of_id(v, id)
+  for row, rid in pairs(v.ids) do
+    if rid == id then
+      return row
+    end
+  end
+end
+
+-- Puts the BeadsCurrent line highlight on the current bead's row (none when it is not in the tree).
+local function mark_current(v)
+  if not vim.api.nvim_buf_is_valid(v.buf) then
+    return
+  end
+  vim.api.nvim_buf_clear_namespace(v.buf, CUR_NS, 0, -1)
+  local row = current.id and row_of_id(v, current.id)
+  if row then
+    vim.api.nvim_buf_set_extmark(v.buf, CUR_NS, row - 1, 0, { line_hl_group = "BeadsCurrent", priority = 50 })
+  end
+end
+
+-- Opens the ancestor folds of the current bead's row and scrolls it into view; focus is unchanged.
+local function reveal(v)
+  local row = current.id and row_of_id(v, current.id)
+  if not (row and vim.api.nvim_win_is_valid(v.win)) then
+    return
+  end
+  vim.api.nvim_win_call(v.win, function()
+    vim.api.nvim_win_set_cursor(0, { row, 0 })
+    vim.cmd("silent! normal! zv")
+    local top, bot = vim.fn.line("w0"), vim.fn.line("w$")
+    if row < top or row > bot then
+      vim.cmd("silent! normal! zz")
+    end
+  end)
+  save_folds(v)
+end
+
 local function render(v)
   if not vim.api.nvim_buf_is_valid(v.buf) then
     return
@@ -284,6 +323,41 @@ local function render(v)
       end
     end
   end
+  mark_current(v)
+end
+
+-- Tracks the most recent beads://<id> buffer: moves the tree highlight and reveals it on BufEnter.
+function M.setup_current()
+  local group = vim.api.nvim_create_augroup("BeadsTreeCurrent", { clear = true })
+  local function each(fn)
+    for _, v in pairs(views) do
+      if vim.api.nvim_win_is_valid(v.win) then
+        fn(v)
+      end
+    end
+  end
+  vim.api.nvim_create_autocmd("BufEnter", {
+    group = group,
+    pattern = "beads://*",
+    callback = function(args)
+      local id = vim.api.nvim_buf_get_name(args.buf):gsub("^beads://", "")
+      current = { id = id, buf = args.buf }
+      each(function(v)
+        mark_current(v)
+        reveal(v)
+      end)
+    end,
+  })
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    group = group,
+    pattern = "beads://*",
+    callback = function(args)
+      if current.buf == args.buf then
+        current = {}
+        each(mark_current)
+      end
+    end,
+  })
 end
 
 local function close(tab)
@@ -354,6 +428,7 @@ local function setup_keys(v, tab)
     end
     vim.api.nvim_set_current_win(pw)
     vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
+    require("beads.flash").flash()
   end))
   map("add_child", with_id(function(id)
     local pw = prev_win(v)
