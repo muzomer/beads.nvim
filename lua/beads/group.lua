@@ -20,6 +20,14 @@ end
 -- Past participle shown in confirmations.
 local VERB = { close = "Close", claim = "Claim", reopen = "Reopen" }
 
+-- Sorts a list of beads by id, in place.
+function M.sort_by_id(list)
+  table.sort(list, function(a, b)
+    return a.id < b.id
+  end)
+  return list
+end
+
 -- Asks "<Verb> N beads? [y/N]" for more than one bead; cb() runs on y.
 function M.confirm(op, n, cb)
   if n <= 1 then
@@ -32,7 +40,8 @@ function M.confirm(op, n, cb)
   end)
 end
 
--- op: "close" (opts.reason) | "claim" | "reopen". ids: list, in tree order.
+-- op: "close" (opts.reason) | "claim" | "reopen" | "batch" (opts.lines: one bd batch) |
+-- "update" (opts.flags: one `bd update <id> <flags>` per bead). ids: list, in tree order.
 function M.run(root, op, ids, opts, done)
   opts = opts or {}
   done = done or function() end
@@ -63,6 +72,11 @@ function M.run(root, op, ids, opts, done)
     finish()
   end
   store.mark_self_write(root)
+  if op == "batch" then
+    return with_root(root, function()
+      cli.batch(opts.lines or {}, all_failed)
+    end)
+  end
   if op == "close" and total > 1 then
     local lines = {}
     for _, id in ipairs(ids) do
@@ -94,7 +108,9 @@ function M.run(root, op, ids, opts, done)
       step()
     end
     with_root(root, function()
-      if op == "close" then
+      if op == "update" then
+        cli.update(id, opts.flags or {}, cb)
+      elseif op == "close" then
         cli.close(id, opts.reason, cb)
       else
         cli.claim(id, cb)

@@ -88,6 +88,14 @@ function M.close(id, reason, cb)
   run(args, true, cb)
 end
 
+-- Runs `bd update <id> <flags...>` (flags: list of argv strings, empty values kept).
+function M.update(id, flags, cb)
+  local args = { "update", id }
+  vim.list_extend(args, flags)
+  args[#args + 1] = "--json"
+  run(args, true, cb)
+end
+
 function M.append_note(id, text, cb)
   run({ "update", id, "--append-notes", text, "--json" }, true, cb)
 end
