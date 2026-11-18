@@ -95,14 +95,13 @@ function M.deliver(root, prompt, note)
     if pok then
       return
     end
-    vim.notify("Beads: agent-poke failed: " .. tostring(err), vim.log.levels.WARN)
+    vim.notify("Beads: agent-poke failed: " .. (tostring(err):match("[^\n]*") or ""), vim.log.levels.WARN)
   end
   vim.fn.setreg('"', prompt)
   vim.notify(
     "Beads: "
       .. (note and note .. " " or "")
-      .. "agent-poke is not available, so the prompt was copied to the \" register; paste it into your agent.\n\n"
-      .. prompt,
+      .. "agent-poke is not available; the prompt is in the \" register.",
     vim.log.levels.WARN
   )
 end
