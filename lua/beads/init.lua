@@ -1,7 +1,7 @@
 local M = {}
 
 M.defaults = {
-  tree = { position = "left", width = nil, height = nil }, -- width/height: computed at open
+  tree = { position = "left", width = "auto", height = "auto", max_width = nil, max_height = nil }, -- auto fits the content; max_*: caps (default half the columns / 40% of the lines)
   keymaps = require("beads.keys").default_map(), -- key, list of keys or false; false disables all
   mouse = true, -- tree: click selects/opens/folds; false installs no mouse maps
   fzf = "auto",

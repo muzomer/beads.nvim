@@ -2,8 +2,9 @@
 -- Interface under test: lua/beads/views/tree.lua via :Beads tree [left|right|bottom|top]
 -- and the tree key keymaps.tree_view.layout (default "L").
 --   * config: tree = { position = "left"|"right"|"bottom"|"top", width = nil, height = nil }.
---     Default width (left/right): floor(columns / 4) clamped 24..42.
---     Default height (bottom/top): floor(lines * 0.3) clamped 6..15.
+--     Default width (left/right) since beads_nvim-4u9.13: "auto", the longest visible line clamped
+--     24..floor(columns / 2). Default height (bottom/top): "auto", the visible line count clamped
+--     6..floor(lines * 0.4). Expected auto sizes are computed from the rendered tree.
 --     Explicit width / height are used as given.
 --   * :Beads tree <pos> opens the tree at <pos>, or moves an open tree there (it does not toggle
 --     it closed). Plain :Beads tree still toggles, opening at the last used position.
@@ -126,9 +127,38 @@ local function geom(w)
   return { row = p[1], col = p[2], width = vim.api.nvim_win_get_width(w), height = vim.api.nvim_win_get_height(w) }
 end
 
+-- The auto size (beads_nvim-4u9.13) the tree's current content asks for at `pos`.
+local function auto_size(t, pos)
+  local rows = vim.api.nvim_win_call(t, function()
+    local out, l, last = {}, 1, vim.fn.line("$")
+    while l <= last do
+      out[#out + 1] = vim.fn.getline(l)
+      local e = vim.fn.foldclosedend(l)
+      l = (e > 0 and e or l) + 1
+    end
+    return out
+  end)
+  if pos == "left" or pos == "right" then
+    local m = 0
+    for _, l in ipairs(rows) do
+      m = math.max(m, vim.fn.strdisplaywidth(l))
+    end
+    return math.max(24, math.min(math.floor(vim.o.columns / 2), m))
+  end
+  return math.max(6, math.min(math.floor(vim.o.lines * 0.4), #rows))
+end
+
 -- Asserts the tree window sits at `pos` with the given size (width for left/right, height for bottom/top).
 local function assert_at(pos, size)
   local t = tree_win()
+  if size == "auto" then
+    local horiz = pos == "left" or pos == "right"
+    vim.wait(1000, function()
+      local cur = horiz and vim.api.nvim_win_get_width(t) or vim.api.nvim_win_get_height(t)
+      return cur == auto_size(t, pos)
+    end, 10)
+    size = auto_size(t, pos)
+  end
   local o = other_win()
   assert.is_not_nil(o, "no editor window next to the tree")
   local tg, og = geom(t), geom(o)
@@ -182,8 +212,8 @@ local function prefill()
   end, 10), "store refresh never completed")
 end
 
--- 120 x 40 screen: default width floor(120/4) = 30, default height floor(40*0.3) = 12.
-local W, H = 30, 12
+-- Default sizes are "auto" (beads_nvim-4u9.13): computed from the rendered tree by assert_at.
+local W, H = "auto", "auto"
 
 describe(":Beads tree layout", function()
   before_each(function()
@@ -257,25 +287,25 @@ describe(":Beads tree layout", function()
     it("width is at least 24 (80 columns)", function()
       vim.o.columns = 80
       vim.cmd("Beads tree left")
-      assert_at("left", 24)
+      assert_at("left", W)
     end)
 
     it("width is at most 42 (200 columns)", function()
       vim.o.columns = 200
       vim.cmd("Beads tree right")
-      assert_at("right", 42)
+      assert_at("right", W)
     end)
 
     it("height is at least 6 (16 lines)", function()
       vim.o.lines = 16
       vim.cmd("Beads tree bottom")
-      assert_at("bottom", 6)
+      assert_at("bottom", H)
     end)
 
     it("height is at most 15 (60 lines)", function()
       vim.o.lines = 60
       vim.cmd("Beads tree top")
-      assert_at("top", 15)
+      assert_at("top", H)
     end)
   end)
 

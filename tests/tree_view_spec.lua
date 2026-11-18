@@ -1,6 +1,6 @@
 -- Interface under test (bead beads_nvim-ge7.12): lua/beads/views/tree.lua via :Beads tree
 --   :Beads tree toggles a left vsplit tree (width from require("beads").config.tree.width,
---   default since beads_nvim-4u9.5: a quarter of the screen clamped 24..42, so 42 at 200 columns), one per tabpage. The tree reads require("beads.store") for cli.get_root()
+--   default since beads_nvim-4u9.13: "auto", the longest visible line clamped 24..floor(columns / 2)), one per tabpage. The tree reads require("beads.store") for cli.get_root()
 --   and re-renders on store notifications.
 --   Lines: indent by parent-child depth, id, priority, status, title, workflow badges,
 --   "⛔ blocked by X" markers for open blockers. Closed beads hidden until H.
@@ -11,6 +11,27 @@
 --   `show <id>` prints $FAKE_DIR/show.json, anything else prints $FAKE_DIR/list.json.
 
 local cli = require("beads.cli")
+
+local function auto_width(t)
+  -- beads_nvim-4u9.13: default width "auto" = longest visible line clamped 24..floor(columns / 2).
+  local m = 0
+  vim.api.nvim_win_call(t, function()
+    local l, last = 1, vim.fn.line("$")
+    while l <= last do
+      m = math.max(m, vim.fn.strdisplaywidth(vim.fn.getline(l)))
+      local e = vim.fn.foldclosedend(l)
+      l = (e > 0 and e or l) + 1
+    end
+  end)
+  return math.max(24, math.min(math.floor(vim.o.columns / 2), m))
+end
+
+local function wait_auto_width(t)
+  vim.wait(1000, function()
+    return vim.api.nvim_win_get_width(t) == auto_width(t)
+  end, 10)
+  return auto_width(t)
+end
 local store = require("beads.store")
 local model = require("beads.model")
 local workflow = require("beads.workflow")
@@ -195,7 +216,7 @@ describe(":Beads tree", function()
     assert.is_not_nil(tree, ":Beads tree opened no window")
     assert.are.equal(n + 1, #wins())
     assert.are.equal(1, vim.fn.win_screenpos(tree)[2], "tree window is not at the left edge")
-    assert.are.equal(42, vim.api.nvim_win_get_width(tree))
+    assert.are.equal(wait_auto_width(tree), vim.api.nvim_win_get_width(tree))
     assert(wait_for(tree, "ep-a"), "tree never rendered:\n" .. dump(tree))
     vim.cmd("Beads tree")
     assert.is_false(vim.api.nvim_win_is_valid(tree), "second :Beads tree did not close the tree window")

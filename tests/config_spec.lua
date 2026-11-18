@@ -1,7 +1,7 @@
 -- Interface under test (bead beads_nvim-ge7.1):
 --   require("beads").setup(opts?) deep-merges opts over the defaults.
 --   The effective config is exposed as require("beads").config.
---   Defaults: config.tree.width == nil (computed at open, beads_nvim-4u9.5), config.keymaps is a non-empty table.
+--   Defaults: config.tree.width == "auto" (beads_nvim-4u9.13), config.keymaps is a non-empty table.
 --   (beads_nvim-4gx.8: setup({ keys }) renamed to setup({ keymaps }), no alias.)
 
 local function fresh_beads()
@@ -19,7 +19,7 @@ describe("beads.setup", function()
     assert.has_no.errors(function()
       beads.setup()
     end)
-    assert.is_nil(beads.config.tree.width)
+    assert.are.equal("auto", beads.config.tree.width)
     assert.are.equal("table", type(beads.config.keymaps))
     assert.is_true(next(beads.config.keymaps) ~= nil, "default keymaps table is empty")
   end)
@@ -29,7 +29,7 @@ describe("beads.setup", function()
     assert.has_no.errors(function()
       beads.setup({})
     end)
-    assert.is_nil(beads.config.tree.width)
+    assert.are.equal("auto", beads.config.tree.width)
   end)
 
   it("deep-merges user options over defaults", function()

@@ -264,6 +264,8 @@ local function mark_current(v)
   end
 end
 
+local apply_layout
+
 -- Opens the ancestor folds of the current bead's row and scrolls it into view; focus is unchanged.
 local function reveal(v)
   local row = current.id and row_of_id(v, current.id)
@@ -279,6 +281,63 @@ local function reveal(v)
     end
   end)
   save_folds(v)
+  apply_layout(v.win, v.pos, v)
+end
+
+local function clamp(n, lo, hi)
+  return math.max(lo, math.min(hi, n))
+end
+
+-- Sizes the tree window for `pos`: a number in tree.width/height is fixed, "auto" fits the visible content.
+-- v.fit records the size the plugin set, so a WinResized with another size is recognised as a manual resize.
+function apply_layout(win, pos, v)
+  local cfg = require("beads").config.tree or {}
+  local horizontal = pos == "left" or pos == "right"
+  local setting = horizontal and cfg.width or cfg.height
+  if setting == nil then
+    setting = "auto"
+  end
+  local size
+  if type(setting) == "number" then
+    size = setting
+  elseif v and v.manual then
+    size = nil
+  else
+    local rows = vim.api.nvim_win_call(win, function()
+      local out, l, last = {}, 1, vim.fn.line("$")
+      while l <= last do
+        out[#out + 1] = vim.fn.getline(l)
+        local e = vim.fn.foldclosedend(l)
+        l = (e > 0 and e or l) + 1
+      end
+      return out
+    end)
+    if horizontal then
+      local m = 0
+      for _, line in ipairs(rows) do
+        m = math.max(m, vim.fn.strdisplaywidth(line))
+      end
+      size = clamp(m, 24, cfg.max_width or math.floor(vim.o.columns / 2))
+    else
+      size = clamp(#rows, 6, cfg.max_height or math.floor(vim.o.lines * 0.4))
+    end
+  end
+  if horizontal then
+    vim.wo[win].winfixheight = false
+    if size then
+      vim.api.nvim_win_set_width(win, size)
+    end
+    vim.wo[win].winfixwidth = true
+  else
+    vim.wo[win].winfixwidth = false
+    if size then
+      vim.api.nvim_win_set_height(win, size)
+    end
+    vim.wo[win].winfixheight = true
+  end
+  if v and size then
+    v.fit = horizontal and vim.api.nvim_win_get_width(win) or vim.api.nvim_win_get_height(win)
+  end
 end
 
 local function render(v)
@@ -350,6 +409,9 @@ local function render(v)
     end
   end
   mark_current(v)
+  if vim.api.nvim_win_is_valid(v.win) then
+    apply_layout(v.win, v.pos, v)
+  end
 end
 
 -- Tracks the most recent beads://<id> buffer: moves the tree highlight and reveals it on BufEnter.
@@ -507,6 +569,7 @@ local function setup_keys(v, tab)
   end)
   map("fold", function()
     vim.cmd("silent! normal! za")
+    apply_layout(v.win, v.pos, v)
   end)
   map("yank_id", with_id(function(id)
     workflow.yank(id)
@@ -524,6 +587,21 @@ local function setup_keys(v, tab)
     close(tab)
   end)
   keys.bind(v.buf, "tree_view", acts)
+  local bound = {}
+  for _, k in ipairs(keys.resolve("tree_view")) do
+    for _, l in ipairs(k[2]) do
+      bound[l] = true
+    end
+  end
+  for _, z in ipairs(require("beads").config.keymaps ~= false and { "zc", "zo", "za", "zA", "zC", "zO", "zM", "zR" } or {}) do
+    if not bound[z] then
+    vim.keymap.set("n", z, function()
+      local n = vim.v.count > 0 and tostring(vim.v.count) or ""
+      vim.cmd("silent! normal! " .. n .. z)
+      apply_layout(v.win, v.pos, v)
+    end, { buffer = v.buf, silent = true, desc = "Beads tree: fold " .. z })
+    end
+  end
   local cfg = require("beads").config
   if cfg.mouse ~= false and cfg.keymaps ~= false then
     local function default_click(double)
@@ -548,6 +626,7 @@ local function setup_keys(v, tab)
         local mi = line:find("▾", 1, true) or line:find("▸", 1, true)
         if mi and dcol == vim.fn.strdisplaywidth(line:sub(1, mi - 1)) then
           vim.cmd("silent! normal! za")
+    apply_layout(v.win, v.pos, v)
           return
         end
         local b = store.get(v.root).by_id[id]
@@ -565,24 +644,6 @@ end
 local POSITIONS = { "left", "bottom", "right", "top" } -- the L cycle order
 local last_position -- remembered for the session
 
-local function clamp(n, lo, hi)
-  return math.max(lo, math.min(hi, n))
-end
-
--- Sizes the tree window for `pos` (explicit config width/height, else the clamped screen fraction).
-local function apply_layout(win, pos)
-  local cfg = require("beads").config.tree or {}
-  if pos == "left" or pos == "right" then
-    vim.wo[win].winfixheight = false
-    vim.api.nvim_win_set_width(win, cfg.width or clamp(math.floor(vim.o.columns / 4), 24, 42))
-    vim.wo[win].winfixwidth = true
-  else
-    vim.wo[win].winfixwidth = false
-    vim.api.nvim_win_set_height(win, cfg.height or clamp(math.floor(vim.o.lines * 0.3), 6, 15))
-    vim.wo[win].winfixheight = true
-  end
-end
-
 local SPLIT = { left = "topleft vsplit", right = "botright vsplit", bottom = "botright split", top = "topleft split" }
 local WINCMD = { left = "H", right = "L", bottom = "J", top = "K" }
 
@@ -597,7 +658,6 @@ local function open(pos)
   vim.cmd(SPLIT[pos])
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, buf)
-  apply_layout(win, pos)
   vim.wo[win].wrap = false
   vim.wo[win].number = false
   vim.wo[win].relativenumber = false
@@ -609,6 +669,7 @@ local function open(pos)
   vim.bo[buf].shiftwidth = 2
   local v = { win = win, buf = buf, pos = pos, root = root, show_closed = false, ids = {}, closed = {} }
   views[tab] = v
+  apply_layout(win, pos, v)
   v.release = require("beads.watch").acquire(root)
   v.unsub = store.subscribe(root, function(_, err)
     if views[tab] ~= v then
@@ -628,6 +689,29 @@ local function open(pos)
         views[tab] = nil
         v.unsub()
         v.release()
+      end
+    end,
+  })
+  local sg = vim.api.nvim_create_augroup("BeadsTreeFit" .. buf, { clear = true })
+  vim.api.nvim_create_autocmd("VimResized", {
+    group = sg,
+    callback = function()
+      if views[tab] ~= v or not vim.api.nvim_win_is_valid(v.win) then
+        return true
+      end
+      apply_layout(v.win, v.pos, v)
+    end,
+  })
+  vim.api.nvim_create_autocmd("WinResized", {
+    group = sg,
+    callback = function()
+      if views[tab] ~= v or not vim.api.nvim_win_is_valid(v.win) then
+        return true
+      end
+      local horizontal = v.pos == "left" or v.pos == "right"
+      local now = horizontal and vim.api.nvim_win_get_width(v.win) or vim.api.nvim_win_get_height(v.win)
+      if v.fit and now ~= v.fit then
+        v.manual = true
       end
     end,
   })
@@ -651,7 +735,8 @@ local function move(v, pos)
     end)
     v.pos = pos
   end
-  apply_layout(v.win, pos)
+  v.manual = false
+  apply_layout(v.win, pos, v)
 end
 
 -- M.toggle(): toggle, opening at the last / configured position.

@@ -1,9 +1,30 @@
 -- Bead beads_nvim-4u9.5: tree.position config in a fresh session (plenary runs each spec file in
 -- its own nvim, so no position is remembered yet). With setup({ tree = { position = "right" } })
--- a plain :Beads tree opens the tree on the right at the default width (floor(120/4) = 30).
+-- a plain :Beads tree opens the tree on the right at the default width ("auto" since beads_nvim-4u9.13).
 -- `bd` is replaced by a shell script on PATH (test double) that prints one bead for any call.
 
 local cli = require("beads.cli")
+
+local function auto_width(t)
+  -- beads_nvim-4u9.13: default width "auto" = longest visible line clamped 24..floor(columns / 2).
+  local m = 0
+  vim.api.nvim_win_call(t, function()
+    local l, last = 1, vim.fn.line("$")
+    while l <= last do
+      m = math.max(m, vim.fn.strdisplaywidth(vim.fn.getline(l)))
+      local e = vim.fn.foldclosedend(l)
+      l = (e > 0 and e or l) + 1
+    end
+  end)
+  return math.max(24, math.min(math.floor(vim.o.columns / 2), m))
+end
+
+local function wait_auto_width(t)
+  vim.wait(1000, function()
+    return vim.api.nvim_win_get_width(t) == auto_width(t)
+  end, 10)
+  return auto_width(t)
+end
 
 local plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
 
@@ -70,9 +91,10 @@ describe("tree.position config", function()
     end
     assert.is_not_nil(tree, ":Beads tree opened no tree window")
     local p = vim.api.nvim_win_get_position(tree)
+    local expected = wait_auto_width(tree)
     local width = vim.api.nvim_win_get_width(tree)
     assert.are.equal(vim.o.columns, p[2] + width, "tree is not at the right edge")
     assert.are.equal(0, vim.api.nvim_win_get_position(main)[2], "editor window is not left of the tree")
-    assert.are.equal(30, width)
+    assert.are.equal(expected, width)
   end)
 end)
