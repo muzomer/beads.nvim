@@ -64,22 +64,71 @@ function M.format(b, opts)
   return table.concat(parts), ranges
 end
 
--- Sort in place: priority ascending (nil last), ties by id.
-function M.sort(list)
-  table.sort(list, function(a, b)
-    local pa, pb = a.priority, b.priority
-    if pa ~= pb then
-      if pa == nil then
+M.SORTS = { "priority", "updated", "id" }
+
+local function by_priority(a, b)
+  local pa, pb = a.priority, b.priority
+  if pa ~= pb then
+    if pa == nil then
+      return false
+    end
+    if pb == nil then
+      return true
+    end
+    return pa < pb
+  end
+  return a.id < b.id
+end
+
+local COMPARE = {
+  priority = by_priority,
+  -- newest first (ISO timestamps compare as strings), missing last, ties by id
+  updated = function(a, b)
+    local ua, ub = a.updated_at, b.updated_at
+    if ua ~= ub then
+      if ua == nil then
         return false
       end
-      if pb == nil then
+      if ub == nil then
         return true
       end
-      return pa < pb
+      return ua > ub
     end
     return a.id < b.id
-  end)
+  end,
+  id = function(a, b)
+    return a.id < b.id
+  end,
+}
+
+-- Sort in place. mode: "priority" (default; ascending, nil last, ties by id), "updated", "id".
+function M.sort(list, mode)
+  table.sort(list, COMPARE[mode or "priority"] or by_priority)
   return list
+end
+
+-- Does bead b match the filter text? Whitespace separated terms, all must match:
+-- status:/label:/assignee:/type: tokens (exact), anything else is a substring of id or title.
+function M.matches(b, text)
+  for term in (text or ""):gmatch("%S+") do
+    local key, val = term:match("^(%a+):(.*)$")
+    local ok
+    if key == "status" then
+      ok = b.status == val
+    elseif key == "assignee" then
+      ok = b.assignee == val
+    elseif key == "type" then
+      ok = b.type == val
+    elseif key == "label" then
+      ok = vim.tbl_contains(b.labels or {}, val)
+    else
+      ok = (b.id or ""):find(term, 1, true) ~= nil or (b.title or ""):find(term, 1, true) ~= nil
+    end
+    if not ok then
+      return false
+    end
+  end
+  return true
 end
 
 -- text with 24-bit ANSI colours from the resolved fg of each range's group (for fzf).

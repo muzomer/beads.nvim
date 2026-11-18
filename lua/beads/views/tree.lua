@@ -13,7 +13,9 @@ local current = {} -- { id, buf } of the most recent beads://<id> detail buffer
 local views = {} -- tabpage -> { win, buf, root, show_closed, ids, unsub, release }
 
 local F = require("beads.ui.format")
-local sorted = F.sort
+local function ordered(list, v)
+  return F.sort(list, v and v.sort)
+end
 
 local function create_key()
   local k = (require("beads").config.keymaps or {}).create
@@ -29,13 +31,30 @@ local MARK_PRI, DIM_PRI = 100, 200
 local function build_lines(v, st)
   local lines, ids, marks, folds = {}, {}, {}, {}
   local seen = {}
+  -- filter: matches plus their ancestors stay; ancestors that do not match are dimmed
+  local keep, matched
+  if v.filter and v.filter ~= "" then
+    keep, matched = {}, {}
+    for id, b in pairs(st.by_id) do
+      if F.matches(b, v.filter) then
+        matched[id] = true
+        local cur, hops = b, 0
+        while cur and not keep[cur.id] and hops < 1000 do
+          keep[cur.id] = true
+          cur = cur.parent and st.by_id[cur.parent]
+          hops = hops + 1
+        end
+        keep[id] = true
+      end
+    end
+  end
   local function visible(b)
-    return v.show_closed or b.status ~= "closed"
+    return (v.show_closed or b.status ~= "closed") and (not keep or keep[b.id] == true)
   end
   -- Visible children of b; hidden children are replaced by their visible descendants.
   local function vis_children(b, stack)
     local out = {}
-    for _, c in ipairs(sorted(st.children_of(b.id))) do
+    for _, c in ipairs(ordered(st.children_of(b.id), v)) do
       if not stack[c.id] then
         if visible(c) then
           out[#out + 1] = c
@@ -109,6 +128,9 @@ local function build_lines(v, st)
     if b.status == "closed" then
       add_mark(row, #prefix, #prefix + #text, "BeadsDim", DIM_PRI)
     end
+    if matched and not matched[b.id] then
+      add_mark(row, #prefix, #prefix + #text, "BeadsDim", DIM_PRI)
+    end
     local child_cells = vim.list_slice(cells)
     if depth > 0 then
       child_cells[#child_cells + 1] = last and "  " or "│ "
@@ -125,7 +147,7 @@ local function build_lines(v, st)
   end
   local top = {}
   local stack = {}
-  for _, b in ipairs(sorted(roots)) do
+  for _, b in ipairs(ordered(roots, v)) do
     if visible(b) then
       top[#top + 1] = b
     else
@@ -151,7 +173,11 @@ local function header_text(v, st)
     end
   end
   local name = vim.fn.fnamemodify((v.root:gsub("/+$", "")), ":t")
-  return ("beads · %s · %d open · %d ready · %d need you"):format(name, open, store.get(v.root).ready_n or 0, need)
+  local head = ("beads · %s · %d open · %d ready · %d need you"):format(name, open, store.get(v.root).ready_n or 0, need)
+  if v.filter and v.filter ~= "" then
+    head = head .. " · filter: " .. v.filter
+  end
+  return head .. " · sort: " .. (v.sort or "priority")
 end
 
 local fold_info = {} -- buf -> row -> { level, start, n, open }
@@ -457,6 +483,26 @@ local function setup_keys(v, tab)
   end)
   map("toggle_closed", function()
     v.show_closed = not v.show_closed
+    render(v)
+  end)
+  map("filter", function()
+    vim.ui.input({ prompt = "Filter (text, status: label: assignee: type:): ", default = v.filter or "" }, function(text)
+      if text == nil then
+        return
+      end
+      text = vim.trim(text)
+      v.filter = text ~= "" and text or nil
+      render(v)
+    end)
+  end)
+  map("sort", function()
+    local idx = 1
+    for i, name in ipairs(F.SORTS) do
+      if name == (v.sort or "priority") then
+        idx = i
+      end
+    end
+    v.sort = F.SORTS[idx % #F.SORTS + 1]
     render(v)
   end)
   map("fold", function()
