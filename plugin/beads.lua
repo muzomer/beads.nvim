@@ -3,8 +3,6 @@ if vim.g.loaded_beads == 1 and vim.fn.exists(":Beads") == 2 then
 end
 vim.g.loaded_beads = 1
 
-local SUBCOMMANDS = { "tree", "ready", "list", "search", "needs", "epics", "show", "create", "cd", "poke", "output", "chat" }
-
 vim.api.nvim_create_user_command("Beads", function(opts)
   require("beads.command").run(opts.fargs)
 end, {
@@ -17,7 +15,7 @@ end, {
     end
     return vim.tbl_filter(function(s)
       return vim.startswith(s, arglead)
-    end, SUBCOMMANDS)
+    end, require("beads.command").subcommands)
   end,
 })
 

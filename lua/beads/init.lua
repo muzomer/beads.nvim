@@ -6,6 +6,8 @@ M.defaults = {
   fzf = "auto",
   glyphs = {}, -- { open, in_progress, blocked, closed, deferred } overrides, or "ascii"
   flash_ms = 350, -- jump flash duration in ms; false disables
+  notify = true, -- false silences the grouped "changed externally" notifications
+  notify_group_ms = 1500, -- external changes within this window are reported in one notification
   type_icons = false, -- or { epic = "", bug = "", feature = "", task = "", chore = "" }
 }
 

@@ -121,10 +121,10 @@ local function view_actions(buf)
   map(buf, "note", text_float("Note", cli.append_note))
   map(buf, "comment", text_float("Comment", cli.comment))
   map(buf, "yank_id", with_bead(function(b)
-    vim.fn.setreg('"', b.id)
+    workflow.yank(b.id)
   end))
   map(buf, "yank_run", with_bead(function(b)
-    vim.fn.setreg('"', workflow.run_command(b))
+    workflow.yank(workflow.run_command(b))
   end))
   acts.open_thread = function()
     local idx = M.thread_at(buf, vim.api.nvim_win_get_cursor(0)[1])
@@ -275,22 +275,6 @@ local function build_prompt(root, bead, thread, lines)
   return table.concat(out, "\n")
 end
 
-local function deliver(root, prompt)
-  local ok, poke = pcall(require, "agent-poke")
-  if ok and type(poke) == "table" and poke.poke then
-    local pok, err = pcall(poke.poke, root, prompt)
-    if pok then
-      return
-    end
-    vim.notify("Beads: agent-poke failed: " .. tostring(err), vim.log.levels.WARN)
-  end
-  vim.fn.setreg('"', prompt)
-  vim.notify(
-    "Beads: question stored. agent-poke is not available, so the prompt was copied to the \" register; paste it into your agent.\n\n" .. prompt,
-    vim.log.levels.WARN
-  )
-end
-
 -- Asks a question about the section under the cursor, or the visual selection (becomes the quote).
 function M.ask(buf)
   local st = state[buf]
@@ -328,7 +312,7 @@ function M.ask(buf)
       return
     end
     local lines = vim.api.nvim_buf_is_valid(buf) and (render.render(bead)) or {}
-    deliver(root, build_prompt(root, bead, thread, lines))
+    workflow.deliver(root, build_prompt(root, bead, thread, lines), "question stored.")
     if vim.api.nvim_buf_is_valid(buf) then
       M.refresh_threads(buf)
     end
@@ -714,16 +698,25 @@ local function subscribe(buf)
       M.load(buf)
     end
   end)
-  vim.api.nvim_create_autocmd("BufWipeout", { buffer = buf, once = true, callback = unsub })
+  local release = require("beads.watch").acquire(state[buf].root)
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    buffer = buf,
+    once = true,
+    callback = function()
+      unsub()
+      release()
+    end,
+  })
 end
 
 local pending_parent
+local pending_root -- root for a buffer being opened from a view (consumed by load / load_new)
 
 -- Fills a beads://new buffer with the create template.
 local function load_new(buf)
   local parent = pending_parent
   pending_parent = nil
-  state[buf] = { bead = nil, root = state[buf] and state[buf].root or cli.get_root(), new = true }
+  state[buf] = { bead = nil, root = state[buf] and state[buf].root or pending_root or cli.get_root(), new = true }
   local lines = render.template({ parent = parent })
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
@@ -731,7 +724,7 @@ local function load_new(buf)
 end
 
 -- Opens beads://new in the current window; parent (optional) is prefilled.
-function M.create_child(parent_id)
+function M.create_child(parent_id, root)
   local existing = vim.fn.bufnr("beads://new")
   if existing ~= -1 and vim.api.nvim_buf_is_valid(existing) then
     if vim.bo[existing].modified and not parent_id then
@@ -744,7 +737,19 @@ function M.create_child(parent_id)
     pcall(vim.api.nvim_buf_delete, existing, { force = true })
   end
   pending_parent = parent_id
-  vim.cmd.edit("beads://new")
+  pending_root = root
+  pcall(vim.cmd.edit, "beads://new")
+  pending_root = nil
+end
+
+-- Opens beads://<id> in the current window, loading and writing with `root` (default: the cli root).
+function M.edit(id, root)
+  pending_root = root
+  local ok, err = pcall(vim.cmd.edit, vim.fn.fnameescape("beads://" .. id))
+  pending_root = nil
+  if not ok then
+    error(err, 0)
+  end
 end
 
 function M.open_new()
@@ -782,7 +787,7 @@ function M.load(buf)
     return
   end
   local id = bead_id(buf)
-  state[buf] = state[buf] or { root = cli.get_root() }
+  state[buf] = state[buf] or { root = pending_root or cli.get_root() }
   if not vim.b[buf].beads_detail_init then
     vim.b[buf].beads_detail_init = true
     vim.bo[buf].buftype = "acwrite"

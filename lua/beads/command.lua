@@ -4,32 +4,36 @@ M.subcommands = { "tree", "ready", "list", "search", "needs", "epics", "question
 
 -- Pass-through to agent-poke.nvim (required at the moment of use).
 function M.agent(sub, arg)
-  local ok, ap = pcall(require, "agent-poke")
-  if not ok or type(ap) ~= "table" then
-    vim.notify(
-      "Beads " .. sub .. ": agent-poke.nvim is not installed (https://github.com/momer/agent-poke.nvim)",
-      vim.log.levels.WARN
-    )
-    return
-  end
   local root = require("beads.cli").get_root()
-  if sub == "poke" and arg == "pick" then
-    ap.pick(root)
-  elseif sub == "poke" then
+  if sub == "poke" and arg ~= "pick" then
     local ids = {}
     for _, t in ipairs(require("beads.questions.store").list(root, { status = "open", needs = "agent" })) do
       ids[#ids + 1] = t.id
     end
     if #ids == 0 then
-      vim.notify("Beads poke: no thread is waiting on the agent", vim.log.levels.INFO)
+      vim.notify("Beads: no thread is waiting on the agent", vim.log.levels.INFO)
       return
     end
-    ap.poke(
+    require("beads.workflow").deliver(
       root,
       "Question threads waiting on you: "
         .. table.concat(ids, ", ")
-        .. ". Read each thread and reply (beads questions)."
+        .. ". Read each thread and answer with the beads-ask CLI:\n"
+        .. "  beads-ask reply <thread-id> <body|->",
+      nil
     )
+    return
+  end
+  local ok, ap = pcall(require, "agent-poke")
+  if not ok or type(ap) ~= "table" then
+    vim.notify(
+      "Beads: " .. sub .. ": agent-poke.nvim is not installed (https://github.com/momer/agent-poke.nvim)",
+      vim.log.levels.WARN
+    )
+    return
+  end
+  if sub == "poke" then
+    ap.pick(root)
   else
     ap[sub](root)
   end
@@ -38,13 +42,13 @@ end
 function M.run(args)
   local sub = args[1]
   if not sub or not vim.tbl_contains(M.subcommands, sub) then
-    vim.notify("Usage: :Beads <" .. table.concat(M.subcommands, "|") .. ">", vim.log.levels.INFO)
+    vim.notify("Beads: usage :Beads <" .. table.concat(M.subcommands, "|") .. ">", vim.log.levels.INFO)
     return
   end
   if sub == "cd" then
     local path = args[2]
     if not path or path == "" then
-      vim.notify("Beads root: " .. require("beads.cli").get_root(), vim.log.levels.INFO)
+      vim.notify("Beads: root " .. require("beads.cli").get_root(), vim.log.levels.INFO)
       return
     end
     require("beads.cli").set_root(vim.fn.fnamemodify(vim.fn.expand(path), ":p"))
@@ -53,7 +57,7 @@ function M.run(args)
   if sub == "show" then
     local id = args[2]
     if not id or id == "" then
-      vim.notify("Usage: :Beads show <id>", vim.log.levels.INFO)
+      vim.notify("Beads: usage :Beads show <id>", vim.log.levels.INFO)
       return
     end
     vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
@@ -80,7 +84,6 @@ function M.run(args)
     require("beads.views.picker").open(sub, query)
     return
   end
-  vim.notify("Beads " .. sub .. ": not implemented yet", vim.log.levels.WARN)
 end
 
 return M

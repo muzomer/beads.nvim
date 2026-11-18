@@ -5,13 +5,8 @@ local store = require("beads.store")
 
 local M = {}
 
-local function first_line(t)
-  local m = t.messages and t.messages[1]
-  return vim.split((m and m.body) or "", "\n", { plain = true })[1] or ""
-end
-
 function M.format(t)
-  return t.bead .. "  " .. first_line(t)
+  return t.bead .. "  " .. require("beads.buffer.render").thread_line(t)
 end
 
 -- cb(threads, err); threads sorted by bead id then thread order.
@@ -85,17 +80,22 @@ end
 
 function M.open()
   local root = cli.get_root()
+  local release = require("beads.watch").acquire(root)
   M.load(root, function(threads, err)
     if err then
-      return vim.notify("Beads questions: " .. err, vim.log.levels.ERROR)
+      release()
+      return vim.notify("Beads: questions: " .. err, vim.log.levels.ERROR)
     end
     if #threads == 0 then
-      return vim.notify("Beads questions: nothing waiting on you", vim.log.levels.INFO)
+      release()
+      return vim.notify("Beads: questions: nothing waiting on you", vim.log.levels.INFO)
     end
     if require("beads").config.fzf then
-      return M.pick_fzf(threads)
+      M.pick_fzf(threads, release)
+      return
     end
     vim.ui.select(threads, { prompt = "Beads questions", format_item = M.format }, function(t)
+      release()
       if t then
         M.open_thread(t)
       end
@@ -103,7 +103,7 @@ function M.open()
   end)
 end
 
-function M.pick_fzf(threads)
+function M.pick_fzf(threads, release)
   local by_line, lines = {}, {}
   for _, t in ipairs(threads) do
     local line = M.format(t)
@@ -113,7 +113,7 @@ function M.pick_fzf(threads)
   local function thread_of(selected)
     return selected and selected[1] and by_line[selected[1]]
   end
-  require("fzf-lua").fzf_exec(lines, {
+  require("beads.views.picker").fzf_exec(lines, {
     prompt = "Beads questions> ",
     preview = function(selected)
       local t = thread_of(selected)
@@ -136,7 +136,7 @@ function M.pick_fzf(threads)
         end
       end,
     },
-  })
+  }, release)
 end
 
 return M

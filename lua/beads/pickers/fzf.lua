@@ -5,7 +5,7 @@ local workflow = require("beads.workflow")
 
 local M = {}
 
-function M.pick(source, beads, picker)
+function M.pick(source, beads, picker, release)
   local by_id, lines = {}, {}
   for _, b in ipairs(beads) do
     by_id[b.id] = b
@@ -48,7 +48,7 @@ function M.pick(source, beads, picker)
       actions[key] = handlers[action]
     end
   end
-  require("fzf-lua").fzf_exec(lines, {
+  picker.fzf_exec(lines, {
     prompt = "Beads " .. source .. "> ",
     preview = function(selected)
       local _, b = first(selected)
@@ -58,7 +58,7 @@ function M.pick(source, beads, picker)
       return table.concat(render.render(b), "\n")
     end,
     actions = actions,
-  })
+  }, release)
 end
 
 return M

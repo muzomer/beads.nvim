@@ -80,4 +80,31 @@ function M.is_needs_me(bead)
   return has_label(bead, "human") or has_label(bead, "needs-review")
 end
 
+-- Yanks text to the " register and says so (one consistent message for tree, detail, pickers).
+function M.yank(text)
+  vim.fn.setreg('"', text)
+  vim.notify("Beads: yanked " .. text, vim.log.levels.INFO)
+end
+
+-- Hands a prompt to agent-poke.nvim; without it (or when it fails) the prompt goes to the " register.
+-- note: optional lead-in for the fallback message.
+function M.deliver(root, prompt, note)
+  local ok, poke = pcall(require, "agent-poke")
+  if ok and type(poke) == "table" and poke.poke then
+    local pok, err = pcall(poke.poke, root, prompt)
+    if pok then
+      return
+    end
+    vim.notify("Beads: agent-poke failed: " .. tostring(err), vim.log.levels.WARN)
+  end
+  vim.fn.setreg('"', prompt)
+  vim.notify(
+    "Beads: "
+      .. (note and note .. " " or "")
+      .. "agent-poke is not available, so the prompt was copied to the \" register; paste it into your agent.\n\n"
+      .. prompt,
+    vim.log.levels.WARN
+  )
+end
+
 return M

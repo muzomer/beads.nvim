@@ -453,7 +453,7 @@ local function setup_keys(v, tab)
       return
     end
     vim.api.nvim_set_current_win(pw)
-    vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
+    require("beads.views.detail").edit(id, v.root)
     require("beads.flash").flash()
   end))
   map("add_child", with_id(function(id)
@@ -462,7 +462,7 @@ local function setup_keys(v, tab)
       return
     end
     vim.api.nvim_set_current_win(pw)
-    require("beads.views.detail").create_child(id)
+    require("beads.views.detail").create_child(id, v.root)
   end))
   map("close_bead", with_id(function(id)
     vim.ui.input({ prompt = "Close reason (optional): " }, function(reason)
@@ -509,12 +509,12 @@ local function setup_keys(v, tab)
     vim.cmd("silent! normal! za")
   end)
   map("yank_id", with_id(function(id)
-    vim.fn.setreg('"', id)
+    workflow.yank(id)
   end))
   map("yank_run", with_id(function(id)
     local b = store.get(v.root).by_id[id]
     if b then
-      vim.fn.setreg('"', workflow.run_command(b))
+      workflow.yank(workflow.run_command(b))
     end
   end))
   map("layout", function()

@@ -41,6 +41,7 @@ returns the mode for a statusline.
 | `]u`, `[u` | `next_waiting`, `prev_waiting` | jump to the next / previous thread waiting for you |
 | `n` | `note` | append a note (float) |
 | `c` | `comment` | add a comment (float) |
+| `a` | `ask` | ask a question about the section under the cursor (or the visual selection) |
 | `yy` | `yank_id` | yank the bead id |
 | `yr` | `yank_run` | yank the workflow run command |
 | `q` | `close` | close the window |

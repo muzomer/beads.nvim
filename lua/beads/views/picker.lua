@@ -83,8 +83,7 @@ function M.id_of_line(line)
 end
 
 function M.yank(text)
-  vim.fn.setreg('"', text)
-  vim.notify("Yanked: " .. text, vim.log.levels.INFO)
+  require("beads.workflow").yank(text)
 end
 
 function M.open_bead(id)
@@ -100,7 +99,7 @@ function M.close_bead(id)
     local root = cli.get_root()
     cli.close(id, reason, function(res)
       if res.err then
-        return vim.notify("bd close failed: " .. res.err, vim.log.levels.ERROR)
+        return vim.notify("Beads: close failed: " .. res.err, vim.log.levels.ERROR)
       end
       store.mark_self_write(root)
       store.refresh(root)
@@ -108,17 +107,63 @@ function M.close_bead(id)
   end)
 end
 
+-- Holds the watcher on `root` while a picker is open; returns an idempotent release().
+function M.hold(root)
+  return require("beads.watch").acquire(root)
+end
+
+-- Runs fzf-lua's fzf_exec and releases `release` (idempotent) when the picker closes: via fzf-lua's
+-- winopts.on_close hook, and additionally via the terminal buffer's end when one is current
+-- (covers <Esc>, which runs no action). Without a terminal buffer (fzf-tmux) on_close is the signal.
+function M.fzf_exec(lines, opts, release)
+  if not release then
+    return require("fzf-lua").fzf_exec(lines, opts)
+  end
+  local done = false
+  local function once()
+    if done then
+      return
+    end
+    done = true
+    vim.schedule(release) -- not inside fzf-lua's teardown
+  end
+  opts.winopts = opts.winopts or {}
+  local prev = opts.winopts.on_close
+  opts.winopts.on_close = function(...)
+    if type(prev) == "function" then
+      pcall(prev, ...)
+    end
+    once()
+  end
+  local ok, err = pcall(require("fzf-lua").fzf_exec, lines, opts)
+  if not ok then
+    once()
+    error(err, 0)
+  end
+  local buf = vim.api.nvim_get_current_buf()
+  if vim.bo[buf].buftype == "terminal" then
+    vim.api.nvim_create_autocmd({ "TermClose", "BufWipeout", "BufHidden" }, {
+      buffer = buf,
+      once = true,
+      callback = once,
+    })
+  end
+end
+
 function M.open(source, query)
   local function go(q)
+    local release = M.hold(cli.get_root())
     M.load(source, q, function(beads, err)
       if err then
-        return vim.notify("Beads " .. source .. ": " .. err, vim.log.levels.ERROR)
+        release()
+        return vim.notify("Beads: " .. source .. ": " .. err, vim.log.levels.ERROR)
       end
       if #beads == 0 then
-        return vim.notify("Beads " .. source .. ": nothing found", vim.log.levels.INFO)
+        release()
+        return vim.notify("Beads: " .. source .. ": nothing found", vim.log.levels.INFO)
       end
       local adapter = require("beads").config.fzf and "fzf" or "select"
-      require("beads.pickers." .. adapter).pick(source, beads, M)
+      require("beads.pickers." .. adapter).pick(source, beads, M, release)
     end)
   end
   if source == "search" and (not query or query == "") then

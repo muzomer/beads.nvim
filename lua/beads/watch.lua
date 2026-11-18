@@ -19,6 +19,65 @@ local function close_handle(h)
   end
 end
 
+local MAX_NAMED = 6
+
+local function flush_notice(st)
+  if st.notify_timer then
+    close_handle(st.notify_timer)
+    st.notify_timer = nil
+  end
+  local ids = st.changed or {}
+  st.changed = nil
+  if st.stopped or #ids == 0 then
+    return
+  end
+  table.sort(ids)
+  local shown = vim.list_slice(ids, 1, MAX_NAMED)
+  local more = #ids > #shown and (" (+%d more)"):format(#ids - #shown) or ""
+  vim.notify("Beads: changed externally: " .. table.concat(shown, ", ") .. more, vim.log.levels.INFO)
+end
+
+-- Collects ids changed by an external write; one notification per notify_group_ms window.
+local function note_changes(st, ids)
+  local cfg = require("beads").config
+  if cfg.notify == false or #ids == 0 then
+    return
+  end
+  st.changed = st.changed or {}
+  for _, id in ipairs(ids) do
+    if not vim.tbl_contains(st.changed, id) then
+      st.changed[#st.changed + 1] = id
+    end
+  end
+  if not st.notify_timer then
+    st.notify_timer = vim.uv.new_timer()
+    st.notify_timer:start(cfg.notify_group_ms or 1500, 0, function()
+      vim.schedule(function()
+        flush_notice(st)
+      end)
+    end)
+  end
+end
+
+local function diff_ids(old, new)
+  local ids = {}
+  if next(old.by_id) == nil then
+    return ids -- nothing was loaded before: not a change
+  end
+  for id, b in pairs(new.by_id) do
+    local o = old.by_id[id]
+    if not o or o.updated_at ~= b.updated_at then
+      ids[#ids + 1] = id
+    end
+  end
+  for id in pairs(old.by_id) do
+    if not new.by_id[id] then
+      ids[#ids + 1] = id
+    end
+  end
+  return ids
+end
+
 local function fire(root, st)
   if st.stopped then
     return
@@ -26,7 +85,12 @@ local function fire(root, st)
   if store.consume_self_write(root) then
     return
   end
-  store.refresh(root)
+  local old = store.get(root)
+  store.refresh(root, function(new, err)
+    if not err and not st.stopped then
+      note_changes(st, diff_ids(old, new))
+    end
+  end)
 end
 
 local function schedule(root, st)
@@ -142,6 +206,9 @@ local function stop(root, st)
   st.handles = {}
   close_handle(st.timer)
   st.timer = nil
+  close_handle(st.notify_timer)
+  st.notify_timer = nil
+  st.changed = nil
   if st.unsub then
     st.unsub()
     st.unsub = nil
@@ -165,7 +232,7 @@ local function detect(root, st)
       st.mode = "focus"
       ensure_autocmds()
       vim.notify(
-        "beads: backend is not embedded; refreshing on focus instead of watching files",
+        "Beads: backend is not embedded; refreshing on focus instead of watching files",
         vim.log.levels.INFO
       )
     end
