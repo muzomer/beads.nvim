@@ -161,6 +161,9 @@ local function view_actions(buf)
   acts.edit = function()
     M.enter_edit(buf)
   end
+  acts.ask = function()
+    M.ask(buf)
+  end
   acts.close = function()
     pcall(vim.cmd, "close")
   end
@@ -196,7 +199,7 @@ local function set_mode(buf, mode)
   vim.b[buf].beads_mode = mode
   vim.bo[buf].modifiable = mode == "edit"
   if mode == "view" then
-    bound[buf] = keys.bind(buf, "detail_view", view_actions(buf))
+    bound[buf] = keys.bind(buf, "detail_view", view_actions(buf), { ask = { "n", "x" } })
   else
     local acts = edit_actions(buf)
     if state[buf] and state[buf].new then
@@ -219,6 +222,115 @@ function M.enter_view(buf)
 end
 
 local apply
+
+local ASK_SECTIONS = { description = true, design = true, acceptance = true, workflow = true, notes = true, comments = true, questions = true }
+
+-- Section name of buffer line `row`: the nearest "## X" heading above it, "title" on the "# " line.
+local function section_at(buf, row)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, row, false)
+  for i = #lines, 1, -1 do
+    local name = lines[i]:match("^## (%a+)")
+    if name and ASK_SECTIONS[name:lower()] then
+      return name:lower()
+    end
+    if lines[i]:match("^# ") then
+      return "title"
+    end
+  end
+  return "frontmatter"
+end
+
+local function titled(root, id)
+  local b = require("beads.store").get(root).by_id[id]
+  return b and b.title and (id .. " - " .. b.title) or id
+end
+
+local function build_prompt(root, bead, thread, lines)
+  local out = {
+    "A question about bead " .. bead.id .. " (" .. (bead.title or "") .. ") needs your answer.",
+    "",
+    "Section: " .. thread.section,
+  }
+  if thread.quote then
+    out[#out + 1] = "Quote: " .. thread.quote
+  end
+  out[#out + 1] = "Thread: " .. thread.id
+  if bead.parent and bead.parent ~= "" then
+    out[#out + 1] = "Parent: " .. titled(root, bead.parent)
+  end
+  for _, id in ipairs(bead.blocked_by or {}) do
+    out[#out + 1] = "Blocked by: " .. titled(root, id)
+  end
+  vim.list_extend(out, { "", "Question:", thread.messages[1].body, "", "The bead as rendered:", "" })
+  vim.list_extend(out, lines)
+  vim.list_extend(out, {
+    "",
+    "Answer with the beads-ask CLI (the thread id is " .. thread.id .. "):",
+    "  beads-ask reply " .. thread.id .. " <body|->",
+    "  beads-ask propose " .. thread.id .. " --field <title|description|design|acceptance> <value|->",
+  })
+  return table.concat(out, "\n")
+end
+
+local function deliver(root, prompt)
+  local ok, poke = pcall(require, "agent-poke")
+  if ok and type(poke) == "table" and poke.poke then
+    local pok, err = pcall(poke.poke, root, prompt)
+    if pok then
+      return
+    end
+    vim.notify("Beads: agent-poke failed: " .. tostring(err), vim.log.levels.WARN)
+  end
+  vim.fn.setreg('"', prompt)
+  vim.notify(
+    "Beads: question stored. agent-poke is not available, so the prompt was copied to the \" register; paste it into your agent.\n\n" .. prompt,
+    vim.log.levels.WARN
+  )
+end
+
+-- Asks a question about the section under the cursor, or the visual selection (becomes the quote).
+function M.ask(buf)
+  local st = state[buf]
+  if not (st and st.bead) then
+    return
+  end
+  local root, bead = st.root, st.bead
+  local quote, row
+  local mode = vim.fn.mode()
+  if mode == "v" or mode == "V" or mode == "\22" then
+    local a, b = vim.fn.getpos("v"), vim.fn.getpos(".")
+    quote = table.concat(vim.fn.getregion(a, b, { type = mode }), "\n")
+    row = math.min(a[2], b[2])
+    vim.cmd("normal! \27")
+    if quote == "" then
+      quote = nil
+    end
+  else
+    row = vim.api.nvim_win_get_cursor(0)[1]
+  end
+  local section = section_at(buf, row)
+  vim.ui.input({ prompt = "Question: " }, function(text)
+    text = text and vim.trim(text)
+    if not text or text == "" then
+      return
+    end
+    local ok, thread = pcall(require("beads.questions.store").add, root, {
+      bead = bead.id,
+      section = section,
+      quote = quote,
+      messages = { { author = "user", body = text } },
+    })
+    if not ok or not thread then
+      vim.notify("Beads: could not store the question: " .. tostring(thread), vim.log.levels.ERROR)
+      return
+    end
+    local lines = vim.api.nvim_buf_is_valid(buf) and (render.render(bead)) or {}
+    deliver(root, build_prompt(root, bead, thread, lines))
+    if vim.api.nvim_buf_is_valid(buf) then
+      M.refresh_threads(buf)
+    end
+  end)
+end
 
 -- Line number of the "## Questions" heading in the buffer, or nil.
 function M.questions_heading(buf)
