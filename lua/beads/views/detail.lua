@@ -126,6 +126,38 @@ local function view_actions(buf)
   map(buf, "yank_run", with_bead(function(b)
     vim.fn.setreg('"', workflow.run_command(b))
   end))
+  acts.open_thread = function()
+    local idx = M.thread_at(buf, vim.api.nvim_win_get_cursor(0)[1])
+    if idx then
+      require("beads.views.thread").open(buf, idx)
+    end
+  end
+  local function jump(dir)
+    return function()
+      local st = state[buf]
+      local h = M.questions_heading(buf)
+      if not (st and st.bead and st.bead.threads and h) then
+        return
+      end
+      local row = vim.api.nvim_win_get_cursor(0)[1]
+      local target
+      for k, t in ipairs(st.bead.threads) do
+        local l = h + k
+        if t.needs == "user" then
+          if dir > 0 and l > row and (not target or l < target) then
+            target = l
+          elseif dir < 0 and l < row and (not target or l > target) then
+            target = l
+          end
+        end
+      end
+      if target then
+        vim.api.nvim_win_set_cursor(0, { target, 0 })
+      end
+    end
+  end
+  acts.next_waiting = jump(1)
+  acts.prev_waiting = jump(-1)
   acts.edit = function()
     M.enter_edit(buf)
   end
@@ -186,7 +218,139 @@ function M.enter_view(buf)
   end
 end
 
-local function apply(buf, bead)
+local apply
+
+-- Line number of the "## Questions" heading in the buffer, or nil.
+function M.questions_heading(buf)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  for i = #lines, 1, -1 do
+    if lines[i] == "## Questions" then
+      return i
+    end
+  end
+end
+
+-- Index of the snapshot thread shown on buffer line `row`, or nil.
+function M.thread_at(buf, row)
+  local st = state[buf]
+  local h = M.questions_heading(buf)
+  if not (st and st.bead and st.bead.threads and h) then
+    return nil
+  end
+  local k = row - h
+  return st.bead.threads[k] and k or nil
+end
+
+-- Threads of bead `id`: stored ones plus the async human ones; cb(threads).
+local function gather(root, id, cb)
+  local ok, threads = pcall(require("beads.questions.store").list, root, { bead = id })
+  threads = ok and threads or {}
+  require("beads.questions.human").list(root, function(res)
+    for _, t in ipairs(res.data or {}) do
+      if t.bead == id then
+        threads[#threads + 1] = t
+      end
+    end
+    cb(threads)
+  end)
+end
+
+-- Re-reads the threads and updates the Questions section in place, keeping unsaved edits.
+function M.refresh_threads(buf, cb)
+  local st = state[buf]
+  if not (st and st.bead) then
+    return
+  end
+  gather(st.root, st.bead.id, function(threads)
+    local cur = state[buf]
+    if not (vim.api.nvim_buf_is_valid(buf) and cur and cur.bead) then
+      return
+    end
+    if not vim.bo[buf].modified then
+      local b = cur.bead
+      b.threads = threads
+      apply(buf, b)
+    else
+      cur.bead.threads = threads
+      local lines, regions = render.render(cur.bead)
+      local tail = {}
+      for _, r in ipairs(regions) do
+        if r.name == "questions" then
+          tail = vim.list_slice(lines, r.first, r.last)
+        end
+      end
+      local h = M.questions_heading(buf)
+      local from = h and h - 1 or vim.api.nvim_buf_line_count(buf)
+      local was = vim.bo[buf].modifiable
+      vim.bo[buf].modifiable = true
+      vim.api.nvim_buf_set_lines(buf, from, -1, false, tail)
+      vim.bo[buf].modifiable = was
+      for row = from, from + #tail - 1 do
+        vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { line_hl_group = "BeadsReadonly" })
+      end
+    end
+    if cb then
+      cb()
+    end
+  end)
+end
+
+local FRONT = { status = true, priority = true, type = true, assignee = true, parent = true }
+local SECTION = { description = "Description", design = "Design", acceptance = "Acceptance" }
+
+-- Writes a proposed field value into the buffer as an unsaved edit and switches to EDIT mode.
+-- Returns an error string when the field cannot be applied.
+function M.apply_field(buf, field, value)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return "buffer is gone"
+  end
+  value = tostring(value)
+  if field == "title" or FRONT[field] then
+    value = value:gsub("%s*\n%s*", " ")
+  end
+  M.enter_edit(buf)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  if field == "title" then
+    for i, l in ipairs(lines) do
+      if l:match("^# ") then
+        vim.api.nvim_buf_set_lines(buf, i - 1, i, false, { "# " .. value })
+        return nil
+      end
+    end
+  elseif FRONT[field] then
+    for i = 2, #lines do
+      if lines[i] == "---" then
+        break
+      end
+      if lines[i]:match("^" .. field .. ":") then
+        vim.api.nvim_buf_set_lines(buf, i - 1, i, false, { field .. ": " .. value })
+        return nil
+      end
+    end
+  elseif SECTION[field] then
+    local heads = { "## Description", "## Design", "## Acceptance", "## Workflow" }
+    for i, l in ipairs(lines) do
+      if l == "## " .. SECTION[field] then
+        local stop = #lines + 1
+        for j = i + 1, #lines do
+          if vim.tbl_contains(heads, lines[j]) then
+            stop = j
+            break
+          end
+        end
+        local new = vim.split(value, "\n", { plain = true })
+        new[#new + 1] = ""
+        vim.api.nvim_buf_set_lines(buf, i, stop - 1, false, new)
+        return nil
+      end
+    end
+  else
+    return "cannot apply a proposal for field '" .. tostring(field) .. "'"
+  end
+  return "field '" .. field .. "' not found in the buffer"
+end
+
+apply = function(buf, bead)
   local lines, regions = render.render(bead)
   state[buf] = { bead = bead, root = state[buf] and state[buf].root or cli.get_root() }
   vim.bo[buf].modifiable = true
@@ -379,7 +543,14 @@ function M.load(buf)
       vim.notify("Beads: bead not found: " .. id, vim.log.levels.ERROR)
       return
     end
-    apply(buf, model.normalize(item))
+    local bead = model.normalize(item)
+    gather(state[buf].root, bead.id, function(threads)
+      if not vim.api.nvim_buf_is_valid(buf) or not state[buf] then
+        return
+      end
+      bead.threads = threads
+      apply(buf, bead)
+    end)
   end, { include_comments = true })
   cli.set_root(prev)
 end

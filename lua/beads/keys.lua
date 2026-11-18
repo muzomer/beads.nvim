@@ -20,12 +20,25 @@ M.defaults = {
     { "edit", { "e", "i" }, "edit this bead" },
     { "close_bead", "x", "close bead (prompts for a reason)" },
     { "claim", "C", "claim bead" },
+    { "open_thread", "<CR>", "open the question thread under the cursor" },
+    { "next_waiting", "]u", "next thread waiting for you" },
+    { "prev_waiting", "[u", "previous thread waiting for you" },
     { "note", "n", "append a note (float)" },
     { "comment", "c", "add a comment (float)" },
     { "yank_id", "yy", "yank bead id" },
     { "yank_run", "yr", "yank workflow run command" },
     { "close", "q", "close window" },
     { "help", { "?", "g?" }, "show this help" },
+  },
+  thread = {
+    { "reply", { "r", "i" }, "reply" },
+    { "resolve", "x", "resolve thread" },
+    { "apply", "a", "apply the proposal to the bead (unsaved edit)" },
+    { "yank_run", "yr", "yank workflow run command (human threads)" },
+    { "next", "n", "next thread" },
+    { "prev", "p", "previous thread" },
+    { "help", { "?", "g?" }, "show this help" },
+    { "close", { "q", "<Esc>" }, "close" },
   },
   detail_edit = {
     { "save", "<C-s>", "save (normal and insert)" },
@@ -89,7 +102,7 @@ function M.default_map()
   out.tree_view = fill("tree_view")
   out.input = fill("input")
   out.picker = fill("picker")
-  out.thread = {}
+  out.thread = fill("thread")
   return out
 end
 
@@ -154,6 +167,7 @@ local TITLES = {
   tree_view = "tree",
   detail_view = "detail view",
   detail_edit = "detail edit",
+  thread = "thread",
   global = "global",
 }
 

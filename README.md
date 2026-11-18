@@ -32,6 +32,8 @@ returns the mode for a statusline.
 | `e`, `i` | `edit` | switch to EDIT mode |
 | `x` | `close_bead` | close the bead (asks for a reason) |
 | `C` | `claim` | claim |
+| `<CR>` | `open_thread` | open the question thread under the cursor (`## Questions`) |
+| `]u`, `[u` | `next_waiting`, `prev_waiting` | jump to the next / previous thread waiting for you |
 | `n` | `note` | append a note (float) |
 | `c` | `comment` | add a comment (float) |
 | `yy` | `yank_id` | yank the bead id |
@@ -47,6 +49,12 @@ failed or refused save stays in EDIT). `beads://new` opens in EDIT mode.
 | `<C-s>` | `save` | save (normal and insert) |
 | `<Esc><Esc>` | `view` | back to VIEW mode; asks before discarding edits |
 | `g?` | `help` | help float |
+
+### Thread float
+
+`keymaps.thread.*`: `r` / `i` reply (`reply`), `x` resolve (`resolve`), `a` apply the proposal as an
+unsaved edit of the detail buffer (`apply`), `n` / `p` next / previous thread (`next`, `prev`), `yr` yank
+the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` close (`close`).
 
 ### Tree
 

@@ -33,7 +33,7 @@ local function region_texts(lines)
     end
   end
   local pos, from = {}, start
-  for _, name in ipairs({ "Workflow", "Notes", "Comments" }) do
+  for _, name in ipairs({ "Workflow", "Notes", "Comments", "Questions" }) do
     for i = from, #lines do
       if lines[i] == "## " .. name then
         pos[name] = i
@@ -43,7 +43,7 @@ local function region_texts(lines)
     end
   end
   local out = {}
-  local names = { "Workflow", "Notes", "Comments" }
+  local names = { "Workflow", "Notes", "Comments", "Questions" }
   for k, name in ipairs(names) do
     if pos[name] then
       local last = #lines
@@ -134,7 +134,7 @@ function M.compute(bead, lines)
   end
   local want = region_texts((render.render(bead)))
   local got = region_texts(lines)
-  for _, name in ipairs({ "Workflow", "Notes", "Comments" }) do
+  for _, name in ipairs({ "Workflow", "Notes", "Comments", "Questions" }) do
     if want[name] ~= got[name] then
       warnings[#warnings + 1] = name .. " is read-only; edit ignored"
     end

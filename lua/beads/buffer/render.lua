@@ -56,6 +56,21 @@ local function time(created)
   return created
 end
 
+-- One Questions line: "- [needs] preview", preview = first line of the first message.
+function M.thread_line(t)
+  local needs = "-"
+  if t.status == "resolved" then
+    needs = "done"
+  elseif t.needs == "agent" then
+    needs = "agent"
+  elseif t.needs == "user" then
+    needs = "you"
+  end
+  local first = t.messages and t.messages[1]
+  local preview = vim.split((first and first.body) or "", "\n", { plain = true })[1] or ""
+  return ("- [%s]%s %s"):format(needs, t.human and " (human)" or "", preview)
+end
+
 function M.render(bead)
   local lines, regions = {}, {}
   frontmatter(lines, bead, true)
@@ -82,6 +97,15 @@ function M.render(bead)
     push_text(lines, c.text)
   end
   regions[#regions + 1] = { name = "comments", first = first, last = #lines }
+
+  if bead.threads and #bead.threads > 0 then
+    first = #lines + 1
+    lines[#lines + 1] = "## Questions"
+    for _, t in ipairs(bead.threads) do
+      lines[#lines + 1] = M.thread_line(t)
+    end
+    regions[#regions + 1] = { name = "questions", first = first, last = #lines }
+  end
   return lines, regions
 end
 
