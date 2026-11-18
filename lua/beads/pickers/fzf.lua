@@ -37,13 +37,17 @@ function M.pick(source, beads, picker, release)
       if id then
         picker.open_bead(id)
       end
+      local extra = #ids_of(selected) - 1
+      if id and extra > 0 then
+        vim.notify("Beads: " .. ("%d selection%s ignored"):format(extra, extra == 1 and "" or "s"))
+      end
     end,
   }
   local handlers = {
     yank_id = function(selected)
-      local id = first(selected)
-      if id then
-        picker.yank(id)
+      local ids = ids_of(selected)
+      if #ids > 0 then
+        picker.yank(table.concat(ids, "\n"))
       end
     end,
     close = function(selected)
@@ -62,9 +66,14 @@ function M.pick(source, beads, picker, release)
       end
     end,
     yank_run = function(selected)
-      local _, b = first(selected)
-      if b then
-        picker.yank(workflow.run_command(b))
+      local cmds = {}
+      for _, id in ipairs(ids_of(selected)) do
+        if by_id[id] then
+          cmds[#cmds + 1] = workflow.run_command(by_id[id])
+        end
+      end
+      if #cmds > 0 then
+        picker.yank(table.concat(cmds, "\n"))
       end
     end,
   }

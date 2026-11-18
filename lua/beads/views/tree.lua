@@ -687,7 +687,7 @@ local function setup_keys(v, tab)
   map("close", function()
     close(tab)
   end)
-  keys.bind(v.buf, "tree_view", acts, { close_bead = { "n", "x" }, claim = { "n", "x" }, actions = { "n", "x" } })
+  keys.bind(v.buf, "tree_view", acts, { close_bead = { "n", "x" }, claim = { "n", "x" }, actions = { "n", "x" }, yank_id = { "n", "x" }, yank_run = { "n", "x" } })
   local bound = {}
   for _, k in ipairs(keys.resolve("tree_view")) do
     for _, l in ipairs(k[2]) do

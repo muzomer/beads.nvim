@@ -74,7 +74,7 @@ the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` c
 
 `keymaps.tree_view.*`: `<CR>` open, `a` add child, `x` close, `C` claim, `R` refresh, `H` toggle closed, `L` cycle the layout (left, bottom, right, top), `f` filter (free text plus `status:`, `label:`, `assignee:`, `type:` tokens; empty clears), `s` cycle the sort (priority, updated, id),
 `gd` peek, `yy` yank id, `yr` yank run command, `q` close, `?` / `g?` help, `za`/`zo`/`zc` fold.
-Selection: `m` toggles a mark (`▍`, `BeadsMarked`; `3m` marks three beads, `mark`), `M` clears all marks (`clear_marks`), `A` opens the action menu (`actions`: close, claim, reopen, yank ids, yank run commands). `x`, `C`, `yy` and `yr` act on the marked beads, else on the visual line range (`x`, `C`, `A`), else on the cursor bead. More than one bead asks `Close 3 beads? [y/N]`; closing runs one `bd batch`, reopening one `bd reopen`. Marks are kept by bead id across refresh, folds, filters and layout moves; failed beads stay marked and one `Beads: n of m failed: <ids>` note is shown.
+Selection: `m` toggles a mark (`▍`, `BeadsMarked`; `3m` marks three beads, `mark`), `M` clears all marks (`clear_marks`), `A` opens the action menu (`actions`): close, claim, reopen, yank ids, yank run commands, set priority, set status, set assignee, set type, add label, remove label, move under epic, remove parent, blocked by, remove dependency. `x`, `C`, `yy` and `yr` act on the marked beads, else on the visual line range (`x`, `C`, `yy`, `yr`, `A`; yanks put one id or run command per line), else on the cursor bead. More than one bead asks `Close 3 beads? [y/N]`; closing runs one `bd batch`, reopening one `bd reopen`. Marks are kept by bead id across refresh, folds, filters and layout moves; failed beads stay marked and one `Beads: n of m failed: <ids>` note is shown.
 
 ### Input floats (ask, reply, note, comment)
 
@@ -93,6 +93,8 @@ is watched and the Questions section, thread floats and badges refresh. Each age
 ### fzf-lua picker
 
 `keymaps.picker.*`: `<CR>` open, `ctrl-y` (`yank_id`), `alt-r` (`yank_run`), `ctrl-x` (`close`).
+
+Multi-select: `<Tab>` toggles a selection, `ctrl-a` opens the action menu for the selected beads. `ctrl-y` and `alt-r` yank every selected id / run command, one per line; `ctrl-x` closes all selected; `<CR>` opens the first selection and notes how many others were ignored.
 
 ## Statusline
 
