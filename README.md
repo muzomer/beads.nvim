@@ -1,7 +1,9 @@
 # beads.nvim
 
 Neovim front end for the [beads](https://github.com/steveyegge/beads) issue tracker (`bd`).
-Commands: `:Beads tree|ready|list|search|needs|epics|questions|show <id>|create|cd <path>`.
+Commands: `:Beads tree|ready|list|search|needs|epics|questions|show <id>|create|cd <path>|poke [pick]|output|chat`.
+`poke`, `output` and `chat` pass through to [agent-poke.nvim](https://github.com/momer/agent-poke.nvim)
+(a hint is shown when it is not installed); `poke` resends the threads waiting on the agent, `poke pick` chooses a target.
 
 ## Keymaps
 
@@ -22,6 +24,8 @@ or `false` (disabled); `keymaps = false` creates no maps at all. Every map has a
 | `<leader>bq` | `questions` | questions waiting on you |
 | `<leader>bc` | `create` | create a bead |
 | `<leader>b?` | `help` | the keys that work where you are |
+| `<leader>bp` | `poke` | poke the agent about threads waiting on it (`:Beads poke`) |
+| `<leader>bP` | `output` | show the agent output (`:Beads output`) |
 
 ### Detail buffer (`beads://<id>`)
 

@@ -1,6 +1,39 @@
 local M = {}
 
-M.subcommands = { "tree", "ready", "list", "search", "needs", "epics", "questions", "show", "create", "cd" }
+M.subcommands = { "tree", "ready", "list", "search", "needs", "epics", "questions", "show", "create", "cd", "poke", "output", "chat" }
+
+-- Pass-through to agent-poke.nvim (required at the moment of use).
+function M.agent(sub, arg)
+  local ok, ap = pcall(require, "agent-poke")
+  if not ok or type(ap) ~= "table" then
+    vim.notify(
+      "Beads " .. sub .. ": agent-poke.nvim is not installed (https://github.com/momer/agent-poke.nvim)",
+      vim.log.levels.WARN
+    )
+    return
+  end
+  local root = require("beads.cli").get_root()
+  if sub == "poke" and arg == "pick" then
+    ap.pick(root)
+  elseif sub == "poke" then
+    local ids = {}
+    for _, t in ipairs(require("beads.questions.store").list(root, { status = "open", needs = "agent" })) do
+      ids[#ids + 1] = t.id
+    end
+    if #ids == 0 then
+      vim.notify("Beads poke: no thread is waiting on the agent", vim.log.levels.INFO)
+      return
+    end
+    ap.poke(
+      root,
+      "Question threads waiting on you: "
+        .. table.concat(ids, ", ")
+        .. ". Read each thread and reply (beads questions)."
+    )
+  else
+    ap[sub](root)
+  end
+end
 
 function M.run(args)
   local sub = args[1]
@@ -24,6 +57,10 @@ function M.run(args)
       return
     end
     vim.cmd.edit(vim.fn.fnameescape("beads://" .. id))
+    return
+  end
+  if sub == "poke" or sub == "output" or sub == "chat" then
+    M.agent(sub, args[2])
     return
   end
   if sub == "tree" then

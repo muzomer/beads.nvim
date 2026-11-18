@@ -69,6 +69,8 @@ M.globals = {
   { "questions", "<leader>bq", "questions waiting on you" },
   { "create", "<leader>bc", "create a bead" },
   { "help", "<leader>b?", "keys that work here" },
+  { "poke", "<leader>bp", "poke the agent about threads waiting on it" },
+  { "output", "<leader>bP", "show the agent output" },
 }
 
 -- Where each group lives in the config.
@@ -338,6 +340,12 @@ function M.setup_globals()
       require("beads.views.detail").open_new()
     end,
     help = M.global_help,
+    poke = function()
+      require("beads.command").run({ "poke" })
+    end,
+    output = function()
+      require("beads.command").run({ "output" })
+    end,
   }
   for _, k in ipairs(M.resolve("global")) do
     for _, lhs in ipairs(k[2]) do
