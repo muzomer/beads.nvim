@@ -170,6 +170,8 @@ local function view_actions(buf)
   return acts
 end
 
+local attach_winbar
+
 local bound = {} -- buf -> list of { mode, lhs } set for the current mode
 
 local function edit_actions(buf)
@@ -197,6 +199,7 @@ end
 local function set_mode(buf, mode)
   keys.unbind(buf, bound[buf])
   vim.b[buf].beads_mode = mode
+  attach_winbar(buf)
   vim.bo[buf].modifiable = mode == "edit"
   if mode == "view" then
     bound[buf] = keys.bind(buf, "detail_view", view_actions(buf), { ask = { "n", "x" } })
@@ -462,6 +465,165 @@ function M.apply_field(buf, field, value)
   return "field '" .. field .. "' not found in the buffer"
 end
 
+local function ts_seconds(iso)
+  local y, mo, d, h, mi, sec = tostring(iso):match("^(%d+)-(%d+)-(%d+)[T ](%d+):(%d+):?(%d*)")
+  if not y then
+    return nil
+  end
+  y, mo, d = tonumber(y), tonumber(mo), tonumber(d)
+  if mo <= 2 then
+    y = y - 1
+  end
+  local era = math.floor(y / 400)
+  local yoe = y - era * 400
+  local doy = math.floor((153 * (mo + (mo > 2 and -3 or 9)) + 2) / 5) + d - 1
+  local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
+  local days = era * 146097 + doe - 719468
+  return days * 86400 + tonumber(h) * 3600 + tonumber(mi) * 60 + (tonumber(sec) or 0)
+end
+
+-- "2h ago" style text for an ISO timestamp, relative to the injectable clock (setup({ now = fn })).
+function M.relative(iso)
+  local t = ts_seconds(iso)
+  if not t then
+    return nil
+  end
+  local now_fn = require("beads").config.now
+  local diff = (type(now_fn) == "function" and now_fn() or os.time()) - t
+  if diff < 60 then
+    return "just now"
+  elseif diff < 3600 then
+    return math.floor(diff / 60) .. "m ago"
+  elseif diff < 86400 then
+    return math.floor(diff / 3600) .. "h ago"
+  end
+  return math.floor(diff / 86400) .. "d ago"
+end
+
+local function cap(s)
+  return (s:gsub("_(%a)", function(c)
+    return c:upper()
+  end):gsub("^%a", string.upper))
+end
+
+local function highlight_values(buf, lines, bead)
+  local function mark(row, word_from, group)
+    local line = lines[row + 1]
+    local s, e = line:find("%S.*%S", word_from)
+    if not s then
+      s, e = line:find("%S", word_from)
+    end
+    if s then
+      vim.api.nvim_buf_set_extmark(buf, ns, row, s - 1, { end_col = e, hl_group = group })
+    end
+  end
+  local function each_item(row, from, group)
+    local line = lines[row + 1]
+    local br = line:match("^[^%[]*%[()")
+    if not br then
+      return
+    end
+    for pos, item in line:gmatch("()([^,%[%]%s][^,%[%]]*)") do
+      if pos >= br then
+        item = item:gsub("%s+$", "")
+        vim.api.nvim_buf_set_extmark(buf, ns, row, pos - 1, { end_col = pos - 1 + #item, hl_group = group })
+      end
+    end
+  end
+  for i = 2, #lines do
+    if lines[i] == "---" then
+      break
+    end
+    local row, key = i - 1, lines[i]:match("^([%w_]+):")
+    if key then
+      local from = #key + 2
+      if key == "id" or key == "parent" then
+        mark(row, from, "BeadsId")
+      elseif key == "status" and bead.status then
+        mark(row, from, "BeadsStatus" .. cap(bead.status))
+      elseif key == "priority" then
+        mark(row, from, "BeadsPriority" .. tostring(bead.priority == nil and 2 or bead.priority))
+      elseif key == "type" then
+        mark(row, from, "BeadsType" .. cap(bead.type or "task"))
+      elseif key == "labels" then
+        each_item(row, from, "BeadsBadgeAgent")
+      elseif key == "blocked_by" then
+        each_item(row, from, "BeadsId")
+      end
+    end
+  end
+end
+
+local function relative_times(buf, bead, regions)
+  local first
+  for _, r in ipairs(regions) do
+    if r.name == "comments" then
+      first = r.first
+    end
+  end
+  if not first then
+    return
+  end
+  local row = first -- 0-based row of the first line after "## Comments"
+  for _, c in ipairs(bead.comments or {}) do
+    local rel = M.relative(c.created_at)
+    if rel then
+      vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { virt_text = { { " (" .. rel .. ")", "BeadsDim" } }, virt_text_pos = "eol" })
+    end
+    local n = (c.text ~= nil and c.text ~= "") and #vim.split(c.text, "\n", { plain = true }) or 0
+    row = row + 1 + n + 1
+  end
+end
+
+-- Winbar text for the window being drawn (evaluated by the 'winbar' option).
+function M.winbar(win)
+  win = win or vim.g.statusline_winid or vim.api.nvim_get_current_win()
+  if win == 0 then
+    win = vim.api.nvim_get_current_win()
+  end
+  local buf = win and vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win)
+  local st = buf and state[buf]
+  if not st then
+    return ""
+  end
+  local function esc(x)
+    return (tostring(x):gsub("%%", "%%%%"))
+  end
+  local mode = vim.b[buf].beads_mode == "edit" and "EDIT" or "VIEW"
+  local out = {}
+  local b = st.bead
+  if b then
+    local status = b.status or ""
+    out[#out + 1] = "%#BeadsStatus" .. cap(status) .. "#" .. esc(require("beads.glyphs").status(status))
+    out[#out + 1] = " %#BeadsId#" .. esc(b.id)
+    out[#out + 1] = " %#BeadsWinbar#· %#BeadsType" .. cap(b.type or "task") .. "#" .. esc(b.type or "task")
+    local p = b.priority == nil and 2 or b.priority
+    out[#out + 1] = " %#BeadsWinbar#· %#BeadsPriority" .. p .. "#P" .. p
+    out[#out + 1] = " %#BeadsWinbar#· %#BeadsStatus" .. cap(status) .. "#" .. esc(status)
+    out[#out + 1] = " %#BeadsWinbar#· "
+  else
+    out[#out + 1] = "%#BeadsWinbar#NEW · "
+  end
+  out[#out + 1] = "%#BeadsMode" .. (mode == "EDIT" and "Edit" or "View") .. "#" .. mode
+  if vim.bo[buf].modified then
+    out[#out + 1] = "%#BeadsWinbar#  %#BeadsWinbarModified#● modified"
+  end
+  if st.changed then
+    out[#out + 1] = "%#BeadsWinbar#  %#BeadsWinbarChanged#⚠ changed on disk"
+  end
+  out[#out + 1] = "%#BeadsWinbar#"
+  return table.concat(out)
+end
+
+local WINBAR_EXPR = "%{%v:lua.require'beads.views.detail'.winbar()%}"
+
+attach_winbar = function(buf)
+  for _, w in ipairs(vim.fn.win_findbuf(buf)) do
+    vim.api.nvim_set_option_value("winbar", WINBAR_EXPR, { scope = "local", win = w })
+  end
+  vim.cmd.redrawstatus()
+end
+
 apply = function(buf, bead)
   local lines, regions = render.render(bead)
   state[buf] = { bead = bead, root = state[buf] and state[buf].root or cli.get_root() }
@@ -475,6 +637,9 @@ apply = function(buf, bead)
       vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { line_hl_group = "BeadsDim" })
     end
   end
+  highlight_values(buf, lines, bead)
+  relative_times(buf, bead, regions)
+  attach_winbar(buf)
 end
 
 -- Fetches the current server version of the bead; cb(bead|nil, err).
@@ -519,6 +684,10 @@ function M.show_diff(buf, server)
 end
 
 local function warn_changed(buf)
+  if state[buf] then
+    state[buf].changed = true
+    pcall(vim.cmd.redrawstatus)
+  end
   if #vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true, type = "virt_lines" }) > 0 then
     return
   end
@@ -620,6 +789,12 @@ function M.load(buf)
     vim.bo[buf].swapfile = false
     vim.bo[buf].bufhidden = "hide"
     vim.bo[buf].filetype = "markdown"
+    vim.api.nvim_create_autocmd({ "BufWinEnter", "TextChanged", "TextChangedI" }, {
+      buffer = buf,
+      callback = function()
+        attach_winbar(buf)
+      end,
+    })
     if id ~= "new" then
       subscribe(buf)
     end

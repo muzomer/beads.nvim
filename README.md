@@ -86,3 +86,16 @@ re-applied on `ColorScheme`; override any with `:hi` or `:hi! link`.
 `glyphs` sets the status glyphs (defaults `○ ◐ ● ✓ ❄` for open, in_progress, blocked, closed, deferred):
 `setup({ glyphs = { open = "O" } })` overrides single ones; `setup({ glyphs = "ascii" })` uses plain ASCII
 `o ~ x v z`. `type_icons = { epic = "E", bug = "B", ... }` enables optional type icons (off by default).
+
+## Detail winbar, highlights and render-markdown.nvim
+
+Detail windows get a winbar `<glyph> <id> · <type> · P<n> · <status> · VIEW|EDIT`, plus `● modified` while
+there are unsaved edits and `⚠ changed on disk` after an external change. Frontmatter values are coloured with
+the `Beads*` groups, and comment headings show a relative time (`2h ago`) as virtual text. For tests the clock
+can be injected with `setup({ now = function() return unix_seconds end })`.
+
+With [render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim) the detail buffer
+(filetype `markdown`) is rendered as usual (headings, code fences). The frontmatter stays readable: the
+`key: value` lines are not concealed or overlaid, the Beads value highlights are extmarks that stay on top,
+and the buffer text is never changed, so parse/render round-trips. If your setup conceals frontmatter, disable
+it for `beads://` buffers.
