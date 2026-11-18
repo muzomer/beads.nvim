@@ -28,12 +28,35 @@ function M.sort_by_id(list)
   return list
 end
 
--- Asks "<Verb> N beads? [y/N]" for more than one bead; cb() runs on y.
-function M.confirm(op, n, cb)
+-- Opens a float listing `lines`; returns its window id.
+local function open_list(lines)
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  local width = 20
+  for _, l in ipairs(lines) do
+    width = math.max(width, vim.fn.strdisplaywidth(l))
+  end
+  width = math.min(width, math.max(vim.o.columns - 4, 20))
+  local height = math.min(#lines, math.max(vim.o.lines - 6, 1))
+  local win = vim.api.nvim_open_win(buf, false, {
+    relative = "editor", row = 1, col = 1, width = width, height = height,
+    style = "minimal", border = "rounded", focusable = false, zindex = 250,
+  })
+  vim.bo[buf].bufhidden = "wipe"
+  return win
+end
+
+-- Asks "<Verb> N beads? [y/N]" for more than one bead; cb() runs on y. With `lines` (one per
+-- target, "id  title") and more than 5 beads, a float lists them while the prompt is open.
+function M.confirm(op, n, cb, lines)
   if n <= 1 then
     return cb()
   end
+  local win = (lines and n > 5) and open_list(lines) or nil
   vim.ui.input({ prompt = ("%s %d beads? [y/N] "):format(VERB[op] or op, n) }, function(ans)
+    if win and vim.api.nvim_win_is_valid(win) then
+      pcall(vim.api.nvim_win_close, win, true)
+    end
     if ans and ans:lower():match("^%s*y") then
       cb()
     end

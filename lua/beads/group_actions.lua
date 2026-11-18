@@ -19,12 +19,24 @@ function M.new(get_root, on_done)
       end
     end)
   end
+  local function confirm(label, ids, cb)
+    local n = #ids
+    local lines
+    if n > 5 then
+      local by_id = store.get(v.root).by_id or {}
+      lines = {}
+      for _, id in ipairs(ids) do
+        lines[#lines + 1] = id .. "  " .. ((by_id[id] and by_id[id].title) or "")
+      end
+    end
+    require("beads.group").confirm(label, n, cb, lines)
+  end
   local function act(op, given)
     local ids = given
     if #ids == 0 then
       return
     end
-    require("beads.group").confirm(op, #ids, function()
+    confirm(op, ids, function()
       if op == "close" then
         vim.ui.input({ prompt = "Close reason (optional): " }, function(reason)
           if reason ~= nil then
@@ -75,12 +87,12 @@ function M.new(get_root, on_done)
     for _, id in ipairs(ids) do
       lines[#lines + 1] = ("update %s %s=%s"):format(id, key, quote_val(value))
     end
-    require("beads.group").confirm("Set " .. key .. " on", #ids, function()
+    confirm("Set " .. key .. " on", ids, function()
       group_run("batch", ids, { lines = lines })
     end)
   end
   local function per_bead(ids, label, flags)
-    require("beads.group").confirm(label, #ids, function()
+    confirm(label, ids, function()
       group_run("update", ids, { flags = flags })
     end)
   end
@@ -90,7 +102,7 @@ function M.new(get_root, on_done)
       lines[#lines + 1] = op == "add" and ("dep add %s %s blocks"):format(id, x) or ("dep remove %s %s"):format(id, x)
     end
     local label = op == "add" and ("Block by " .. x .. " on") or ("Remove dependency " .. x .. " from")
-    require("beads.group").confirm(label, #ids, function()
+    confirm(label, ids, function()
       group_run("batch", ids, { lines = lines })
     end)
   end
