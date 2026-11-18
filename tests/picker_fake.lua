@@ -178,9 +178,10 @@ function M.strip(s)
   return (tostring(s):gsub("\27%[[%d;]*m", ""))
 end
 
--- Id at the start of a picker line (after stripping ANSI codes and leading blanks).
+-- Id at the start of a picker line (after stripping ANSI codes, leading blanks and a leading
+-- status glyph, bead beads_nvim-4u9.2: "<glyph> <id> <P#> <title> <badges>").
 function M.line_id(line)
-  return M.strip(line):match("^%s*([%w%-%._]+)")
+  return M.strip(line):match("^%s*[^%w%s]*%s*([%w%-%._]+)")
 end
 
 function M.ids_of(lines)

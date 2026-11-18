@@ -32,7 +32,7 @@ end
 
 local function tree_line(w, id)
   for _, l in ipairs(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(w), 0, -1, false)) do
-    if l:match("^%s*" .. vim.pesc(id) .. "%s") then
+    if l:match("^[%s│├└─▾▸]*%S+%s+" .. vim.pesc(id) .. "%s") then
       return l
     end
   end

@@ -6,21 +6,15 @@ local keys = require("beads.keys")
 
 local M = {}
 
+local NS = vim.api.nvim_create_namespace("beads_tree")
+
 local views = {} -- tabpage -> { win, buf, root, show_closed, ids, unsub, release }
 
-local function sorted(list)
-  table.sort(list, function(a, b)
-    local pa, pb = a.priority or 99, b.priority or 99
-    if pa ~= pb then
-      return pa < pb
-    end
-    return a.id < b.id
-  end)
-  return list
-end
+local F = require("beads.ui.format")
+local sorted = F.sort
 
 local function build_lines(v, st)
-  local lines, ids = {}, {}
+  local lines, ids, hls, hls_off = {}, {}, {}, {}
   local seen = {}
   local function visible(b)
     return v.show_closed or b.status ~= "closed"
@@ -37,22 +31,18 @@ local function build_lines(v, st)
       end
       return
     end
-    local parts = {
-      string.rep("  ", depth) .. b.id,
-      "P" .. tostring(b.priority or "?"),
-      b.status or "?",
-      b.title or "",
-    }
-    for _, g in ipairs(workflow.badges(b)) do
-      parts[#parts + 1] = g
-    end
+    local blockers = {}
     for _, bid in ipairs(b.blocked_by or {}) do
       local blk = st.by_id[bid]
       if not blk or blk.status ~= "closed" then
-        parts[#parts + 1] = "⛔ blocked by " .. bid
+        blockers[#blockers + 1] = bid
       end
     end
-    lines[#lines + 1] = table.concat(parts, " ")
+    local text, ranges = F.format(b, { blockers = blockers })
+    local indent = string.rep("  ", depth)
+    lines[#lines + 1] = indent .. text
+    hls[#lines] = ranges
+    hls_off[#lines] = #indent
     ids[#lines] = b.id
     for _, c in ipairs(sorted(st.children_of(b.id))) do
       emit(c, depth + 1)
@@ -67,7 +57,7 @@ local function build_lines(v, st)
   for _, b in ipairs(sorted(roots)) do
     emit(b, 0)
   end
-  return lines, ids
+  return lines, ids, hls, hls_off
 end
 
 local function render(v)
@@ -78,11 +68,20 @@ local function render(v)
   if vim.api.nvim_win_is_valid(v.win) then
     cur_id = v.ids[vim.api.nvim_win_get_cursor(v.win)[1]]
   end
-  local lines, ids = build_lines(v, store.get(v.root))
+  local lines, ids, hls, offs = build_lines(v, store.get(v.root))
   v.ids = ids
   vim.bo[v.buf].modifiable = true
   vim.api.nvim_buf_set_lines(v.buf, 0, -1, false, lines)
   vim.bo[v.buf].modifiable = false
+  vim.api.nvim_buf_clear_namespace(v.buf, NS, 0, -1)
+  for row, ranges in pairs(hls) do
+    for _, r in ipairs(ranges) do
+      vim.api.nvim_buf_set_extmark(v.buf, NS, row - 1, offs[row] + r.col, {
+        end_col = offs[row] + r.end_col,
+        hl_group = r.group,
+      })
+    end
+  end
   if cur_id and vim.api.nvim_win_is_valid(v.win) then
     for row, id in pairs(ids) do
       if id == cur_id then

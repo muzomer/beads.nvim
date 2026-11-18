@@ -8,17 +8,6 @@ local M = {}
 
 M.sources = { "ready", "list", "search", "needs", "epics" }
 
-local function sort_beads(list)
-  table.sort(list, function(a, b)
-    local pa, pb = a.priority or 99, b.priority or 99
-    if pa ~= pb then
-      return pa < pb
-    end
-    return a.id < b.id
-  end)
-  return list
-end
-
 local function from_store(filter, cb)
   local root = cli.get_root()
   store.refresh(root, function(state, err)
@@ -31,7 +20,7 @@ local function from_store(filter, cb)
         out[#out + 1] = b
       end
     end
-    cb(sort_beads(out))
+    cb(require("beads.ui.format").sort(out))
   end)
 end
 
@@ -77,18 +66,20 @@ function M.load(source, query, cb)
   end
 end
 
--- id, P<n>, status, title, badges
+-- Plain line text (vim.ui.select).
 function M.format(b)
-  local parts = { b.id, "P" .. tostring(b.priority or "?"), b.status or "?", b.title or "" }
-  local badges = workflow.badges(b)
-  if #badges > 0 then
-    parts[#parts + 1] = table.concat(badges, " ")
-  end
-  return table.concat(parts, "  ")
+  return (require("beads.ui.format").format(b))
 end
 
+-- Line text with ANSI colours (fzf).
+function M.format_ansi(b)
+  local F = require("beads.ui.format")
+  return F.ansi(F.format(b))
+end
+
+-- Id of a picker line: the second field (the first is the status glyph).
 function M.id_of_line(line)
-  return (tostring(line or ""):gsub("\27%[[%d;]*m", "")):match("^%s*([%w%-%._]+)")
+  return (tostring(line or ""):gsub("\27%[[%d;]*m", "")):match("^%s*%S+%s+([%w%-%._]+)")
 end
 
 function M.yank(text)

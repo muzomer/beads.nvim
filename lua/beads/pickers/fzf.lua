@@ -9,7 +9,7 @@ function M.pick(source, beads, picker)
   local by_id, lines = {}, {}
   for _, b in ipairs(beads) do
     by_id[b.id] = b
-    lines[#lines + 1] = picker.format(b)
+    lines[#lines + 1] = picker.format_ansi(b)
   end
   local function first(selected)
     local id = selected and selected[1] and picker.id_of_line(selected[1])

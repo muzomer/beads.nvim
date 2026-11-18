@@ -2,7 +2,7 @@
 -- with fzf-lua ABSENT, so the vim.ui.select adapter (lua/beads/pickers/select.lua) is used.
 --   Sources: ready (bd ready --json), list (open + in_progress from the store),
 --   search (bd search <q> --json; :Beads search <q>), needs (workflow.is_needs_me), epics (type epic).
---   Line: id, P<priority>, status, title, workflow badges.
+--   Line: status glyph, id, P<priority>, title, workflow badges (bead beads_nvim-4u9.2).
 --   Choosing an item opens beads://<id>.
 -- vim.ui.select is stubbed to capture items; lines are read via opts.format_item (or tostring).
 -- bd is a fake on PATH (tests/picker_fake.lua).
@@ -93,7 +93,7 @@ describe("pickers without fzf-lua (vim.ui.select)", function()
     assert.are.same(fake.sorted(fake.EXPECTED.epics), fake.ids_of(l))
   end)
 
-  it("a line shows id, priority, status, title and workflow badges", function()
+  it("a line shows status glyph, id, priority, title and workflow badges", function()
     local l = run("Beads list")
     local line
     for _, x in ipairs(l) do
@@ -104,7 +104,7 @@ describe("pickers without fzf-lua (vim.ui.select)", function()
     assert.is_not_nil(line, "no line for op-a")
     local p_id = line:find("op-a", 1, true)
     local p_prio = line:find("P1", 1, true)
-    local p_status = line:find("open", 1, true)
+    local p_status = line:find(require("beads.glyphs").status("open"), 1, true)
     local p_title = line:find("Open alpha", 1, true)
     assert.is_not_nil(p_prio, "priority P1 missing: " .. line)
     assert.is_not_nil(p_status, "status missing: " .. line)
