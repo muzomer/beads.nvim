@@ -205,7 +205,14 @@ local function lines_for(group)
 end
 
 -- Extra help sections appended after Global: { heading, function() -> lines }.
-M.help_sections = {}
+M.help_sections = {
+  {
+    "Symbols",
+    function(group)
+      return require("beads.legend").lines(group)
+    end,
+  },
+}
 
 -- Grouped help lines: the current place's section (if any), Global, then M.help_sections.
 local function help_lines(group)

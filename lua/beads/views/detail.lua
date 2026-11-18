@@ -590,7 +590,7 @@ function M.winbar(win)
   end
   out[#out + 1] = "%#BeadsMode" .. (mode == "EDIT" and "Edit" or "View") .. "#" .. mode
   if vim.bo[buf].modified then
-    out[#out + 1] = "%#BeadsWinbar#  %#BeadsWinbarModified#● modified"
+    out[#out + 1] = "%#BeadsWinbar#  %#BeadsWinbarModified#[+]"
   end
   if st.changed then
     out[#out + 1] = "%#BeadsWinbar#  %#BeadsWinbarChanged#⚠ changed on disk"

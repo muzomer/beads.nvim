@@ -99,9 +99,36 @@ re-applied on `ColorScheme`; override any with `:hi` or `:hi! link`.
 `setup({ glyphs = { open = "O" } })` overrides single ones; `setup({ glyphs = "ascii" })` uses plain ASCII
 `o ~ x v z`. `type_icons = { epic = "E", bug = "B", ... }` enables optional type icons (off by default).
 
+## Symbols
+
+Each symbol has one meaning (the exception: `·` also separates fields in the tree header and the detail winbar). The help float (`?`, `g?`, `<leader>b?`) lists the ones of the current view
+using your active glyphs; all of them are configurable (`glyphs`, `workflow.glyphs`).
+
+| Symbol | Meaning |
+| --- | --- |
+| ○ | open |
+| ◐ | in progress |
+| ● | blocked |
+| ✓ | closed |
+| ❄ | deferred |
+| · | unknown status |
+| ✅ | review clean |
+| ❌ / ❌r2 | review found issues (r<n> = review round) |
+| 🟢 | gate pass |
+| 🔴 | gate fail |
+| 👤 | needs a human |
+| 👀 | needs review |
+| ⏸ | parked |
+| 💬 | waiting on you |
+| ▾ / ▸ | tree node expanded / folded |
+| ⛔ | blocked by another bead |
+| │ ├ └ | tree guides |
+| [+] | detail buffer modified (unsaved edits) |
+| ⚠ | detail buffer changed on disk |
+
 ## Detail winbar, highlights and render-markdown.nvim
 
-Detail windows get a winbar `<glyph> <id> · <type> · P<n> · <status> · VIEW|EDIT`, plus `● modified` while
+Detail windows get a winbar `<glyph> <id> · <type> · P<n> · <status> · VIEW|EDIT`, plus `[+]` (modified) while
 there are unsaved edits and `⚠ changed on disk` after an external change. Frontmatter values are coloured with
 the `Beads*` groups, and comment headings show a relative time (`2h ago`) as virtual text. For tests the clock
 can be injected with `setup({ now = function() return unix_seconds end })`.

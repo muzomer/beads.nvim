@@ -52,22 +52,22 @@ local ALL_TASK_META = {
 }
 
 describe("beads.workflow.badges", function()
-  it("renders verdict ISSUES with review_round 2 as '✗r2'", function()
+  it("renders verdict ISSUES with review_round 2 as '❌r2'", function()
     local _, workflow = fresh()
     local b = bead({ metadata = { verdict = "ISSUES", review_round = 2 } })
-    assert.are.same({ "✗r2" }, workflow.badges(b))
+    assert.are.same({ "❌r2" }, workflow.badges(b))
   end)
 
-  it("renders verdict ISSUES without review_round as '✗'", function()
+  it("renders verdict ISSUES without review_round as '❌'", function()
     local _, workflow = fresh()
     local b = bead({ metadata = { verdict = "ISSUES" } })
-    assert.are.same({ "✗" }, workflow.badges(b))
+    assert.are.same({ "❌" }, workflow.badges(b))
   end)
 
-  it("renders verdict CLEAN as '✓' (no round suffix even when review_round is set)", function()
+  it("renders verdict CLEAN as '✅' (no round suffix even when review_round is set)", function()
     local _, workflow = fresh()
-    assert.are.same({ "✓" }, workflow.badges(bead({ metadata = { verdict = "CLEAN" } })))
-    assert.are.same({ "✓" }, workflow.badges(bead({ metadata = { verdict = "CLEAN", review_round = 1 } })))
+    assert.are.same({ "✅" }, workflow.badges(bead({ metadata = { verdict = "CLEAN" } })))
+    assert.are.same({ "✅" }, workflow.badges(bead({ metadata = { verdict = "CLEAN", review_round = 1 } })))
   end)
 
   it("renders distinct non-empty gate pass and gate fail badges", function()
@@ -98,7 +98,7 @@ describe("beads.workflow.badges", function()
       labels = { "needs-review", "human", "other" },
       metadata = { verdict = "ISSUES", review_round = 3, gate = "pass", parked = "p" },
     })
-    assert.are.same({ "✗r3", gate_only, "👤", "👀", "⏸" }, workflow.badges(b))
+    assert.are.same({ "❌r3", gate_only, "👤", "👀", "⏸" }, workflow.badges(b))
   end)
 
   it("returns an empty list for a bead with no workflow metadata or labels", function()
@@ -137,7 +137,7 @@ describe("beads.workflow glyph overrides", function()
     local beads, workflow = fresh()
     beads.setup({ workflow = { glyphs = { clean = "OK" } } })
     local b = bead({ labels = { "human" }, metadata = { verdict = "ISSUES" } })
-    assert.are.same({ "✗", "👤" }, workflow.badges(b))
+    assert.are.same({ "❌", "👤" }, workflow.badges(b))
   end)
 end)
 

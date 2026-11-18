@@ -1,10 +1,10 @@
 local M = {}
 
 M.default_glyphs = {
-  clean = "✓",
-  issues = "✗",
-  gate_pass = "●",
-  gate_fail = "○",
+  clean = "✅",
+  issues = "❌",
+  gate_pass = "🟢",
+  gate_fail = "🔴",
   human = "👤",
   needs_review = "👀",
   parked = "⏸",

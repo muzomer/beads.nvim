@@ -6,7 +6,7 @@
 --   * Highlight groups (via %#Group# items): glyph and status -> BeadsStatus<Status>, id -> BeadsId,
 --     type -> BeadsType<Type>, "P<n>" -> BeadsPriority<n>, VIEW -> BeadsModeView,
 --     EDIT -> BeadsModeEdit.
---   * "● modified" (BeadsWinbarModified) while the buffer has unsaved edits;
+--   * "[+]" (BeadsWinbarModified) while the buffer has unsaved edits;
 --     "⚠ changed on disk" (BeadsWinbarChanged) after an external change arrives while modified.
 --   * The winbar follows mode switches (e / <Esc><Esc>), modification and reloads.
 -- bd is a fake on PATH (tests/detail_winbar_fake.lua).
@@ -88,15 +88,15 @@ describe("detail winbar", function()
       assert.is_nil(wb().str:find("EDIT", 1, true))
     end)
 
-    it("shows '● modified' (BeadsWinbarModified) while unsaved, and drops it after discard", function()
+    it("shows '[+]' (BeadsWinbarModified) while unsaved, and drops it after discard", function()
       local buf = fake.open_detail()
       wait_winbar(has("VIEW"), "view winbar")
       assert.is_nil(wb().str:find("modified", 1, true))
       to_edit(buf)
       edit_title(buf, "Changed title")
       assert.is_true(vim.bo[buf].modified)
-      wait_winbar(has("● modified"), "modified marker")
-      assert.equals("BeadsWinbarModified", fake.winbar_group_at(wb(), "● modified"))
+      wait_winbar(has("[+]"), "modified marker")
+      assert.equals("BeadsWinbarModified", fake.winbar_group_at(wb(), "[+]"))
       vim.ui.select = function(items, _, on_choice)
         for _, it in ipairs(items) do
           if tostring(it):lower():find("discard", 1, true) then
@@ -117,7 +117,7 @@ describe("detail winbar", function()
       local buf = fake.open_detail()
       to_edit(buf)
       edit_title(buf, "Local edit")
-      wait_winbar(has("● modified"), "modified marker")
+      wait_winbar(has("[+]"), "modified marker")
       assert.is_nil(wb().str:find("changed on disk", 1, true))
       fake.write_bead({ updated_at = "2026-11-10T11:00:00Z" })
       require("beads.store").refresh(fake.dir())

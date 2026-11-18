@@ -110,7 +110,7 @@ describe("pickers without fzf-lua (vim.ui.select)", function()
     assert.is_not_nil(p_status, "status missing: " .. line)
     assert.is_not_nil(p_title, "title missing: " .. line)
     assert.is_true(p_id < p_prio and p_prio < p_title, "id, priority, title out of order: " .. line)
-    assert.is_truthy(line:find("✓", 1, true), "verdict badge missing: " .. line)
+    assert.is_truthy(line:find("✅", 1, true), "verdict badge missing: " .. line)
     assert.is_truthy(line:find("👤", 1, true), "human badge missing: " .. line)
   end)
 
