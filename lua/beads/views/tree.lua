@@ -524,6 +524,42 @@ local function setup_keys(v, tab)
     close(tab)
   end)
   keys.bind(v.buf, "tree_view", acts)
+  local cfg = require("beads").config
+  if cfg.mouse ~= false and cfg.keymaps ~= false then
+    local function default_click(double)
+      vim.api.nvim_feedkeys(vim.keycode(double and "<2-LeftMouse>" or "<LeftMouse>"), "n", false)
+    end
+    local function mouse(double)
+      return function()
+        local mp = vim.fn.getmousepos()
+        if mp.winid ~= v.win or mp.line < 1 or not v.ids[mp.line] then
+          return default_click(double)
+        end
+        vim.api.nvim_set_current_win(v.win)
+        pcall(vim.api.nvim_win_set_cursor, v.win, { mp.line, math.max(0, mp.column - 1) })
+        local id = v.ids[mp.line]
+        if double then
+          acts.open()
+          return
+        end
+        local line = vim.api.nvim_buf_get_lines(v.buf, mp.line - 1, mp.line, false)[1] or ""
+        local info = vim.fn.getwininfo(v.win)[1]
+        local dcol = mp.wincol - info.textoff - 1
+        local mi = line:find("▾", 1, true) or line:find("▸", 1, true)
+        if mi and dcol == vim.fn.strdisplaywidth(line:sub(1, mi - 1)) then
+          vim.cmd("silent! normal! za")
+          return
+        end
+        local b = store.get(v.root).by_id[id]
+        local ti = b and b.title and line:find(b.title, 1, true)
+        if ti and mp.column >= ti and mp.column < ti + #b.title then
+          acts.open()
+        end
+      end
+    end
+    vim.keymap.set("n", "<LeftMouse>", mouse(false), { buffer = v.buf, silent = true, desc = "Beads tree: click" })
+    vim.keymap.set("n", "<2-LeftMouse>", mouse(true), { buffer = v.buf, silent = true, desc = "Beads tree: open" })
+  end
 end
 
 local POSITIONS = { "left", "bottom", "right", "top" } -- the L cycle order

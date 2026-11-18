@@ -176,8 +176,20 @@ local TITLES = {
   detail_view = "detail view",
   detail_edit = "detail edit",
   thread = "thread",
+  input = "input",
   global = "global",
 }
+
+-- Help section heading and title word per group.
+local HEADINGS = {
+  tree_view = "Tree",
+  detail_view = "View mode",
+  detail_edit = "Edit mode",
+  thread = "Thread",
+  input = "Input",
+  global = "Global",
+}
+local MODES = { tree_view = "tree", detail_view = "view", detail_edit = "edit", thread = "thread", input = "input" }
 
 local EXTRA = {
   tree_view = { "za/zo/zc  fold" },
@@ -189,6 +201,32 @@ local function lines_for(group)
     lines[#lines + 1] = string.format("%-12s %s", table.concat(k[2], " "), k[3])
   end
   vim.list_extend(lines, EXTRA[group] or {})
+  return lines
+end
+
+-- Extra help sections appended after Global: { heading, function() -> lines }.
+M.help_sections = {}
+
+-- Grouped help lines: the current place's section (if any), Global, then M.help_sections.
+local function help_lines(group)
+  local lines = {}
+  local function add(heading, body)
+    if #lines > 0 then
+      lines[#lines + 1] = ""
+    end
+    lines[#lines + 1] = "── " .. heading .. " ──"
+    vim.list_extend(lines, body)
+  end
+  if group and group ~= "global" then
+    add(HEADINGS[group], lines_for(group))
+  end
+  add(HEADINGS.global, lines_for("global"))
+  for _, s in ipairs(M.help_sections) do
+    local body = s[2](group)
+    if body and #body > 0 then
+      add(s[1], body)
+    end
+  end
   return lines
 end
 
@@ -224,13 +262,12 @@ local function float(title, lines)
 end
 
 function M.help_float(group)
-  float("Beads " .. TITLES[group] .. " keys", lines_for(group))
+  float("Beads help (" .. (MODES[group] or "keys") .. ")", help_lines(group))
 end
 
 -- <leader>b?: the keys of the current buffer (if it is a beads view) plus the global keys.
 function M.global_help()
-  local lines = {}
-  local group
+  local group = vim.b.beads_group
   if vim.b.beads_mode == "view" then
     group = "detail_view"
   elseif vim.b.beads_mode == "edit" then
@@ -238,12 +275,7 @@ function M.global_help()
   elseif vim.bo.filetype == "beads-tree" then
     group = "tree_view"
   end
-  if group then
-    vim.list_extend(lines, lines_for(group))
-    lines[#lines + 1] = ""
-  end
-  vim.list_extend(lines, lines_for("global"))
-  float("Beads keys" .. (group and (" (" .. TITLES[group] .. ")") or ""), lines)
+  M.help_float(group)
 end
 
 -- Sets buffer-local normal maps for a group. actions: action -> function. Returns the list of
@@ -255,6 +287,9 @@ function M.bind(buf, group, actions, modes)
     end,
   })
   local set = {}
+  if group == "thread" then
+    vim.b[buf].beads_group = group
+  end
   for _, k in ipairs(M.resolve(group)) do
     local fn = actions[k[1]]
     if fn then
@@ -282,6 +317,7 @@ end
 
 -- Input float maps: submit (n+i), submit_normal (n), cancel (n).
 function M.bind_input(buf, submit, cancel)
+  vim.b[buf].beads_group = "input"
   for _, k in ipairs(M.resolve("input")) do
     for _, lhs in ipairs(k[2]) do
       local o = { buffer = buf, nowait = true, silent = true, desc = "Beads input: " .. k[3] }

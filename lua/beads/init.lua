@@ -3,6 +3,7 @@ local M = {}
 M.defaults = {
   tree = { position = "left", width = nil, height = nil }, -- width/height: computed at open
   keymaps = require("beads.keys").default_map(), -- key, list of keys or false; false disables all
+  mouse = true, -- tree: click selects/opens/folds; false installs no mouse maps
   fzf = "auto",
   glyphs = {}, -- { open, in_progress, blocked, closed, deferred } overrides, or "ascii"
   flash_ms = 350, -- jump flash duration in ms; false disables
