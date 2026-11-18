@@ -32,7 +32,7 @@ local BADGE_WORD = {
   parked = "park",
   waiting = "wait",
 }
-local TREE_MARKERS = { "▾", "▸", "⛔", "│", "├", "└" }
+local TREE_MARKERS = { "▾", "▸", "⛔", "│", "├", "└", "▍" }
 local WINBAR_MARKERS = { "[+]", "⚠" }
 
 local function fresh_beads()

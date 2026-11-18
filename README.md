@@ -74,6 +74,7 @@ the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` c
 
 `keymaps.tree_view.*`: `<CR>` open, `a` add child, `x` close, `C` claim, `R` refresh, `H` toggle closed, `L` cycle the layout (left, bottom, right, top), `f` filter (free text plus `status:`, `label:`, `assignee:`, `type:` tokens; empty clears), `s` cycle the sort (priority, updated, id),
 `gd` peek, `yy` yank id, `yr` yank run command, `q` close, `?` / `g?` help, `za`/`zo`/`zc` fold.
+Selection: `m` toggles a mark (`▍`, `BeadsMarked`; `3m` marks three beads, `mark`), `M` clears all marks (`clear_marks`), `A` opens the action menu (`actions`: close, claim, reopen, yank ids, yank run commands). `x`, `C`, `yy` and `yr` act on the marked beads, else on the visual line range (`x`, `C`, `A`), else on the cursor bead. More than one bead asks `Close 3 beads? [y/N]`; closing runs one `bd batch`, reopening one `bd reopen`. Marks are kept by bead id across refresh, folds, filters and layout moves; failed beads stay marked and one `Beads: n of m failed: <ids>` note is shown.
 
 ### Input floats (ask, reply, note, comment)
 
@@ -140,6 +141,7 @@ using your active glyphs; all of them are configurable (`glyphs`, `workflow.glyp
 | ▾ / ▸ | tree node expanded / folded |
 | ⛔ | blocked by another bead |
 | │ ├ └ | tree guides |
+| ▍ | marked for a group action (`m` / `M`) |
 | [+] | detail buffer modified (unsaved edits) |
 | ⚠ | detail buffer changed on disk |
 

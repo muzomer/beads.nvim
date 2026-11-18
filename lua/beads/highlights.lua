@@ -26,6 +26,7 @@ local links = {
   BeadsBlocked = "DiagnosticError",
   BeadsCurrent = "CursorLine",
   BeadsFlash = "IncSearch",
+  BeadsMarked = "DiagnosticWarn",
   BeadsFold = "Folded",
   BeadsGuide = "NonText",
   BeadsHeader = "Title",

@@ -7,10 +7,11 @@ local keys = require("beads.keys")
 local M = {}
 
 local NS = vim.api.nvim_create_namespace("beads_tree")
+local MARK_NS = vim.api.nvim_create_namespace("beads_tree_marked")
 local CUR_NS = vim.api.nvim_create_namespace("beads_tree_current")
 local current = {} -- { id, buf } of the most recent beads://<id> detail buffer
 
-local views = {} -- tabpage -> { win, buf, root, show_closed, ids, unsub, release }
+local views = {} -- tabpage -> { win, buf, root, show_closed, ids, marked (id -> true), unsub, release }
 
 local F = require("beads.ui.format")
 local function ordered(list, v)
@@ -361,6 +362,23 @@ function apply_layout(win, pos, v)
   end
 end
 
+-- Puts the ▍ marker (virtual text, buffer text unchanged) on the rows of marked beads.
+local function paint_marks(v)
+  if not vim.api.nvim_buf_is_valid(v.buf) then
+    return
+  end
+  vim.api.nvim_buf_clear_namespace(v.buf, MARK_NS, 0, -1)
+  for row, id in pairs(v.ids) do
+    if v.marked and v.marked[id] then
+      vim.api.nvim_buf_set_extmark(v.buf, MARK_NS, row - 1, 0, {
+        virt_text = { { "▍", "BeadsMarked" } },
+        virt_text_pos = "inline",
+        priority = 150,
+      })
+    end
+  end
+end
+
 local function render(v)
   if not vim.api.nvim_buf_is_valid(v.buf) then
     return
@@ -430,6 +448,7 @@ local function render(v)
     end
   end
   mark_current(v)
+  paint_marks(v)
   if vim.api.nvim_win_is_valid(v.win) then
     apply_layout(v.win, v.pos, v)
   end
@@ -523,12 +542,97 @@ local function setup_keys(v, tab)
     fn()
     cli.set_root(prev)
   end
-  local function after(res)
-    if res.err then
-      vim.notify("Beads: " .. res.err, vim.log.levels.ERROR)
+  local function row_ids(first, last)
+    local out = {}
+    for r = first, last do
+      if v.ids[r] then
+        out[#out + 1] = v.ids[r]
+      end
     end
-    store.mark_self_write(v.root)
-    store.refresh(v.root)
+    return out
+  end
+  -- Target beads: marks (tree order), else the visual line range, else the cursor bead.
+  local function targets()
+    local in_visual = vim.fn.mode():match("^[vV\22]") ~= nil
+    local first, last = vim.fn.line("v"), vim.fn.line(".")
+    if in_visual then
+      vim.cmd("normal! \27")
+    end
+    local out, seen = {}, {}
+    for r = 1, vim.api.nvim_buf_line_count(v.buf) do
+      local id = v.ids[r]
+      if id and v.marked[id] then
+        out[#out + 1] = id
+        seen[id] = true
+      end
+    end
+    local rest = {}
+    for id in pairs(v.marked) do
+      if not seen[id] then
+        rest[#rest + 1] = id
+      end
+    end
+    vim.list_extend(out, vim.fn.sort(rest))
+    if #out > 0 then
+      return out
+    end
+    if in_visual then
+      return row_ids(math.min(first, last), math.max(first, last))
+    end
+    return row_ids(last, last)
+  end
+  local function group_run(op, ids, opts)
+    require("beads.group").run(v.root, op, ids, opts, function(failed)
+      local bad = {}
+      for _, id in ipairs(failed) do
+        bad[id] = true
+      end
+      for _, id in ipairs(ids) do
+        if not bad[id] then
+          v.marked[id] = nil
+        end
+      end
+      paint_marks(v)
+    end)
+  end
+  local function act(op, given)
+    local ids = given or targets()
+    if #ids == 0 then
+      return
+    end
+    require("beads.group").confirm(op, #ids, function()
+      if op == "close" then
+        vim.ui.input({ prompt = "Close reason (optional): " }, function(reason)
+          if reason ~= nil then
+            group_run("close", ids, { reason = reason })
+          end
+        end)
+      else
+        group_run(op, ids)
+      end
+    end)
+  end
+  local function yank(what, given)
+    local ids = given or targets()
+    if #ids == 0 then
+      return
+    end
+    local by_id = store.get(v.root).by_id
+    local out = {}
+    for _, id in ipairs(ids) do
+      if what == "run" then
+        if by_id[id] then
+          out[#out + 1] = workflow.run_command(by_id[id])
+        end
+      else
+        out[#out + 1] = id
+      end
+    end
+    if #out == 1 then
+      return workflow.yank(out[1])
+    end
+    vim.fn.setreg('"', table.concat(out, "\n"))
+    vim.notify("Beads: yanked " .. #out .. (what == "run" and " run commands" or " ids"), vim.log.levels.INFO)
   end
   map("open", with_id(function(id)
     local pw = prev_win(v)
@@ -547,20 +651,54 @@ local function setup_keys(v, tab)
     vim.api.nvim_set_current_win(pw)
     require("beads.views.detail").create_child(id, v.root)
   end))
-  map("close_bead", with_id(function(id)
-    vim.ui.input({ prompt = "Close reason (optional): " }, function(reason)
-      if reason ~= nil then
-        in_root(function()
-          cli.close(id, reason, after)
-        end)
+  map("close_bead", function()
+    act("close")
+  end)
+  map("claim", function()
+    act("claim")
+  end)
+  map("mark", function()
+    local row = vim.api.nvim_win_get_cursor(0)[1]
+    for r = row, math.min(row + vim.v.count1 - 1, vim.api.nvim_buf_line_count(v.buf)) do
+      local id = v.ids[r]
+      if id then
+        v.marked[id] = (not v.marked[id]) or nil
       end
+    end
+    paint_marks(v)
+  end)
+  map("clear_marks", function()
+    v.marked = {}
+    paint_marks(v)
+  end)
+  map("actions", function()
+    local items = {
+      { "close", "close" },
+      { "claim", "claim" },
+      { "reopen", "reopen" },
+      { "yank_id", "yank ids" },
+      { "yank_run", "yank run commands" },
+    }
+    local ids = targets()
+    if #ids == 0 then
+      return
+    end
+    vim.ui.select(items, {
+      prompt = ("Beads: %d bead%s"):format(#ids, #ids == 1 and "" or "s"),
+      format_item = function(it)
+        return it[2]
+      end,
+    }, function(choice)
+      if not choice then
+        return
+      end
+      local k = choice[1]
+      if k == "yank_id" or k == "yank_run" then
+        return yank(k == "yank_run" and "run" or "id", ids)
+      end
+      act(k, ids)
     end)
-  end))
-  map("claim", with_id(function(id)
-    in_root(function()
-      cli.claim(id, after)
-    end)
-  end))
+  end)
   map("refresh", function()
     store.refresh(v.root)
   end)
@@ -592,15 +730,12 @@ local function setup_keys(v, tab)
     vim.cmd("silent! normal! za")
     apply_layout(v.win, v.pos, v)
   end)
-  map("yank_id", with_id(function(id)
-    workflow.yank(id)
-  end))
-  map("yank_run", with_id(function(id)
-    local b = store.get(v.root).by_id[id]
-    if b then
-      workflow.yank(workflow.run_command(b))
-    end
-  end))
+  map("yank_id", function()
+    yank("id")
+  end)
+  map("yank_run", function()
+    yank("run")
+  end)
   map("peek", function()
     require("beads.views.peek").at_cursor(v.root)
   end)
@@ -610,7 +745,7 @@ local function setup_keys(v, tab)
   map("close", function()
     close(tab)
   end)
-  keys.bind(v.buf, "tree_view", acts)
+  keys.bind(v.buf, "tree_view", acts, { close_bead = { "n", "x" }, claim = { "n", "x" }, actions = { "n", "x" } })
   local bound = {}
   for _, k in ipairs(keys.resolve("tree_view")) do
     for _, l in ipairs(k[2]) do
@@ -691,7 +826,7 @@ local function open(pos)
   vim.wo[win].foldtext = "v:lua.require'beads.views.tree'.foldtext()"
   vim.wo[win].foldlevel = 99
   vim.bo[buf].shiftwidth = 2
-  local v = { win = win, buf = buf, pos = pos, root = root, show_closed = false, ids = {}, closed = {} }
+  local v = { win = win, buf = buf, pos = pos, root = root, show_closed = false, ids = {}, closed = {}, marked = {} }
   views[tab] = v
   apply_layout(win, pos, v)
   v.release = require("beads.watch").acquire(root)

@@ -45,6 +45,7 @@ function M.lines(group)
     out[#out + 1] = row("▸", "folded (has children)")
     out[#out + 1] = row("⛔", "blocked by another bead")
     out[#out + 1] = row("│ ├ └", "tree guides (nesting)")
+    out[#out + 1] = row("▍", "marked for a group action (m / M)")
   elseif group == "detail_view" or group == "detail_edit" then
     out[#out + 1] = row("[+]", "modified (unsaved edits)")
     out[#out + 1] = row("⚠", "changed on disk")

@@ -105,6 +105,14 @@ function M.batch(lines, cb)
   end)
 end
 
+-- Reopens several beads with one call.
+function M.reopen(ids, cb)
+  local args = { "reopen" }
+  vim.list_extend(args, ids)
+  args[#args + 1] = "--json"
+  run(args, true, cb)
+end
+
 function M.ready(cb)
   run({ "ready", "--json" }, true, cb)
 end
