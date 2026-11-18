@@ -25,7 +25,7 @@ local MARK_PRI, DIM_PRI = 100, 200
 
 -- Returns lines, ids (row -> bead id), marks (row -> { {col, end_col, group, priority} }).
 local function build_lines(v, st)
-  local lines, ids, marks = {}, {}, {}
+  local lines, ids, marks, folds = {}, {}, {}, {}
   local seen = {}
   local function visible(b)
     return v.show_closed or b.status ~= "closed"
@@ -50,7 +50,7 @@ local function build_lines(v, st)
     marks[row] = marks[row] or {}
     table.insert(marks[row], { col = col, end_col = end_col, group = group, priority = pri })
   end
-  local function emit(b, depth, cells, last)
+  local function emit(b, depth, cells, last, fold_depth)
     if seen[b.id] then
       return
     end
@@ -85,6 +85,13 @@ local function build_lines(v, st)
     local row = #lines + 1
     lines[row] = prefix .. text .. suffix
     ids[row] = b.id
+    local nopen = 0
+    for _, c in ipairs(kids) do
+      if c.status ~= "closed" then
+        nopen = nopen + 1
+      end
+    end
+    folds[row] = { level = fold_depth + (#kids > 0 and 1 or 0), start = #kids > 0, n = #kids, open = nopen }
     if #guide > 0 then
       add_mark(row, 0, #guide, "BeadsGuide", MARK_PRI)
     end
@@ -105,7 +112,7 @@ local function build_lines(v, st)
       child_cells[#child_cells + 1] = last and "  " or "│ "
     end
     for i, c in ipairs(kids) do
-      emit(c, depth + 1, child_cells, i == #kids)
+      emit(c, depth + 1, child_cells, i == #kids, fold_depth + (#kids > 0 and 1 or 0))
     end
   end
   local roots = st.roots()
@@ -126,9 +133,9 @@ local function build_lines(v, st)
     end
   end
   for _, b in ipairs(top) do
-    emit(b, 0, {}, false)
+    emit(b, 0, {}, false, 0)
   end
-  return lines, ids, marks
+  return lines, ids, marks, folds
 end
 
 local function header_text(v, st)
@@ -145,6 +152,70 @@ local function header_text(v, st)
   return ("beads · %s · %d open · %d ready · %d need you"):format(name, open, store.get(v.root).ready_n or 0, need)
 end
 
+local fold_info = {} -- buf -> row -> { level, start, n, open }
+
+function M.foldexpr(lnum)
+  local f = (fold_info[vim.api.nvim_get_current_buf()] or {})[lnum]
+  if not f then
+    return 0
+  end
+  return (f.start and ">" or "") .. f.level
+end
+
+function M.foldtext()
+  local f = (fold_info[vim.api.nvim_get_current_buf()] or {})[vim.v.foldstart]
+  local line = vim.fn.getline(vim.v.foldstart):gsub("▾", "▸", 1)
+  if not f then
+    return line
+  end
+  return ("%s (%d children, %d open)"):format(line, f.n, f.open)
+end
+
+-- Records which fold-start beads are currently closed (by id); nested ones inside a closed fold keep their state.
+local function save_folds(v)
+  if not (vim.api.nvim_win_is_valid(v.win) and v.fold_rows) then
+    return
+  end
+  vim.api.nvim_win_call(v.win, function()
+    for row, id in pairs(v.fold_rows) do
+      local fc = vim.fn.foldclosed(row)
+      if fc == row then
+        v.closed[id] = true
+      elseif fc == -1 then
+        v.closed[id] = nil
+      end
+    end
+  end)
+end
+
+local function restore_folds(v)
+  -- deepest folds first, top to bottom within a level (bucketed by level, no sorting)
+  local by_level, maxlevel, maxrow = {}, 0, 0
+  for row, id in pairs(v.fold_rows) do
+    if v.closed[id] then
+      local level = fold_info[v.buf][row].level
+      by_level[level] = by_level[level] or {}
+      by_level[level][row] = true
+      maxlevel = math.max(maxlevel, level)
+      maxrow = math.max(maxrow, row)
+    end
+  end
+  local todo = {}
+  for level = maxlevel, 0, -1 do
+    for row = 1, maxrow do
+      if by_level[level] and by_level[level][row] then
+        todo[#todo + 1] = { row = row, level = level }
+      end
+    end
+  end
+  vim.api.nvim_win_call(v.win, function()
+    vim.cmd("silent! normal! zR")
+    for _, t in ipairs(todo) do
+      pcall(vim.cmd, ("silent! %dfoldclose"):format(t.row))
+    end
+  end)
+end
+
 local function render(v)
   if not vim.api.nvim_buf_is_valid(v.buf) then
     return
@@ -153,20 +224,25 @@ local function render(v)
   if vim.api.nvim_win_is_valid(v.win) then
     cur_id = v.ids[vim.api.nvim_win_get_cursor(v.win)[1]]
   end
+  save_folds(v)
   local st = store.get(v.root)
-  local lines, ids, marks = build_lines(v, st)
+  local lines, ids, marks, folds = build_lines(v, st)
   if v.not_repo then
-    lines, ids, marks = { "Not a beads repo — run bd init" }, {}, {}
+    lines, ids, marks, folds = { "Not a beads repo — run bd init" }, {}, {}, {}
   elseif v.loaded then
     local head = { header_text(v, st) }
     if next(st.by_id) == nil then
       head[2] = "No beads here — " .. create_key() .. " to create"
     end
     local n = #head
-    local nl, ni, nm = vim.list_extend(head, lines), {}, {}
+    local nl, ni, nm, nf = vim.list_extend(head, lines), {}, {}, {}
     for row, id in pairs(ids) do
       ni[row + n] = id
     end
+    for row, f in pairs(folds) do
+      nf[row + n] = f
+    end
+    folds = nf
     for row, m in pairs(marks) do
       nm[row + n] = m
     end
@@ -177,6 +253,13 @@ local function render(v)
     end
   end
   v.ids = ids
+  fold_info[v.buf] = folds
+  v.fold_rows = {}
+  for row, f in pairs(folds) do
+    if f.start then
+      v.fold_rows[row] = ids[row]
+    end
+  end
   vim.bo[v.buf].modifiable = true
   vim.api.nvim_buf_set_lines(v.buf, 0, -1, false, lines)
   vim.bo[v.buf].modifiable = false
@@ -189,6 +272,9 @@ local function render(v)
         priority = m.priority,
       })
     end
+  end
+  if vim.api.nvim_win_is_valid(v.win) then
+    restore_folds(v)
   end
   if cur_id and vim.api.nvim_win_is_valid(v.win) then
     for row, id in pairs(ids) do
@@ -298,6 +384,9 @@ local function setup_keys(v, tab)
     v.show_closed = not v.show_closed
     render(v)
   end)
+  map("fold", function()
+    vim.cmd("silent! normal! za")
+  end)
   map("yank_id", with_id(function(id)
     vim.fn.setreg('"', id)
   end))
@@ -331,10 +420,12 @@ local function open()
   vim.wo[win].number = false
   vim.wo[win].relativenumber = false
   vim.wo[win].signcolumn = "no"
-  vim.wo[win].foldmethod = "indent"
+  vim.wo[win].foldmethod = "expr"
+  vim.wo[win].foldexpr = "v:lua.require'beads.views.tree'.foldexpr(v:lnum)"
+  vim.wo[win].foldtext = "v:lua.require'beads.views.tree'.foldtext()"
   vim.wo[win].foldlevel = 99
   vim.bo[buf].shiftwidth = 2
-  local v = { win = win, buf = buf, root = root, show_closed = false, ids = {} }
+  local v = { win = win, buf = buf, root = root, show_closed = false, ids = {}, closed = {} }
   views[tab] = v
   v.release = require("beads.watch").acquire(root)
   v.unsub = store.subscribe(root, function(_, err)
@@ -350,6 +441,7 @@ local function open()
     buffer = buf,
     once = true,
     callback = function()
+      fold_info[buf] = nil
       if views[tab] == v then
         views[tab] = nil
         v.unsub()

@@ -11,6 +11,7 @@ M.defaults = {
     { "claim", "C", "claim bead" },
     { "refresh", "R", "refresh" },
     { "toggle_closed", "H", "toggle closed beads" },
+    { "fold", "<Tab>", "toggle fold" },
     { "yank_id", "yy", "yank bead id" },
     { "yank_run", "yr", "yank workflow run command" },
     { "close", "q", "close tree" },
