@@ -36,6 +36,7 @@ M.defaults = {
     { "prev_bead", "[b", "previous bead in tree order (count ok)" },
     { "ask", "a", "ask a question about the section / selection" },
     { "peek", "gd", "peek the bead id under the cursor (float)" },
+    { "details", "K", "bead details (peek float) for the bead id under the cursor" },
     { "note", "n", "append a note (float)" },
     { "comment", "c", "add a comment (float)" },
     { "yank_id", "yy", "yank bead id" },
@@ -49,19 +50,33 @@ M.defaults = {
     { "apply", "a", "apply the proposal to the bead (unsaved edit)" },
     { "yank_run", "yr", "yank workflow run command (human threads)" },
     { "peek", "gd", "peek the bead id under the cursor (float)" },
+    { "details", "K", "bead details (peek float) for the bead id under the cursor" },
     { "next", "n", "next thread" },
     { "prev", "p", "previous thread" },
     { "help", { "?", "g?" }, "show this help" },
     { "close", { "q", "<Esc>" }, "close" },
   },
+  -- Actions in PEEK_INHERIT take their keys from keymaps.peek, else keymaps.detail.view, else the
+  -- default here (the float is a read-only detail view).
   peek = {
+    { "edit", { "e", "i" }, "edit this bead in the main window (closes the floats)" },
+    { "close_bead", "x", "close bead (prompts for a reason)" },
+    { "claim", "C", "claim bead" },
+    { "next_waiting", "]u", "next thread waiting for you" },
+    { "prev_waiting", "[u", "previous thread waiting for you" },
+    { "next_bead", "]b", "replace this float with the next bead in tree order (count ok)" },
+    { "prev_bead", "[b", "replace this float with the previous bead in tree order (count ok)" },
+    { "ask", "a", "ask a question about the section / selection" },
     { "peek", "gd", "peek the bead id under the cursor (stacks another float)" },
+    { "details", "K", "bead details (peek float) for the bead id under the cursor" },
+    { "note", "n", "append a note (float)" },
+    { "comment", "c", "add a comment (float)" },
     { "close", { "q", "<Esc>" }, "close the top peek float" },
     { "close_all", "Q", "close all peek floats" },
-    { "open", "<CR>", "open this bead in the main window, close all peeks" },
+    { "open", "<CR>", "open this bead in the main window (a question line: its thread), close all peeks" },
     { "yank_id", "yy", "yank bead id" },
     { "yank_run", "yr", "yank workflow run command" },
-    { "help", "?", "show this help" },
+    { "help", { "?", "g?" }, "show this help" },
   },
   detail_edit = {
     { "save", "<C-s>", "save (normal and insert)" },
@@ -112,6 +127,12 @@ local function section(cfg, group)
   return cfg[group]
 end
 
+local PEEK_INHERIT = {
+  edit = true, close_bead = true, claim = true, open_thread = true, next_waiting = true, prev_waiting = true,
+  next_bead = true, prev_bead = true, ask = true, peek = true, details = true, note = true, comment = true,
+  yank_id = true, yank_run = true, help = true,
+}
+
 -- The default config value: { tree = "<leader>bt", ..., detail = { view = {...}, edit = {...} }, ... }
 function M.default_map()
   local out = { detail = {} }
@@ -132,6 +153,10 @@ function M.default_map()
   out.picker = fill("picker")
   out.thread = fill("thread")
   out.peek = fill("peek")
+  for a in pairs(PEEK_INHERIT) do
+    out.peek[a] = nil -- unset: falls back to keymaps.detail.view.<a>
+  end
+  out.peek.open = nil -- unset: falls back to keymaps.detail.view.open_thread
   return out
 end
 
@@ -172,8 +197,23 @@ function M.resolve(group)
   local sec = section(cfg, group) or {}
   for _, d in ipairs(group == "global" and M.globals or M.defaults[group]) do
     local v = d[2]
-    if type(sec) == "table" and sec[d[1]] ~= nil then
+    if group == "peek" and d[1] == "open" then
+      -- the peek's open follows open_thread: peek.open_thread, peek.open, detail.view.open_thread
+      local dv = section(cfg, "detail_view")
+      if type(sec) == "table" and sec.open_thread ~= nil then
+        v = sec.open_thread
+      elseif type(sec) == "table" and sec.open ~= nil then
+        v = sec.open
+      elseif type(dv) == "table" and dv.open_thread ~= nil then
+        v = dv.open_thread
+      end
+    elseif type(sec) == "table" and sec[d[1]] ~= nil then
       v = sec[d[1]]
+    elseif group == "peek" and PEEK_INHERIT[d[1]] then
+      local dv = section(cfg, "detail_view")
+      if type(dv) == "table" and dv[d[1]] ~= nil then
+        v = dv[d[1]]
+      end
     end
     local l = lhs_list(v)
     if #l > 0 then

@@ -41,6 +41,7 @@ returns the mode for a statusline.
 | `]u`, `[u` | `next_waiting`, `prev_waiting` | jump to the next / previous thread waiting for you |
 | `]b`, `[b` | `next_bead`, `prev_bead` | open the next / previous bead in tree order in this window (a count works; follows the open tree's sort, filter and `H`) |
 | `gd` | `peek` | peek the bead id under the cursor in a floating read-only detail (see "Peek floats"); other words fall back to Vim's `gd` |
+| `K` | `details` | bead details (peek float) for the bead id under the cursor; does nothing elsewhere |
 | `n` | `note` | append a note (float) |
 | `c` | `comment` | add a comment (float) |
 | `a` | `ask` | ask a question about the section under the cursor (or the visual selection) |
@@ -62,11 +63,11 @@ failed or refused save stays in EDIT). `beads://new` opens in EDIT mode.
 
 `keymaps.thread.*`: `r` / `i` reply (`reply`), `x` resolve (`resolve`), `a` apply the proposal as an
 unsaved edit of the detail buffer (`apply`), `n` / `p` next / previous thread (`next`, `prev`), `yr` yank
-the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` close (`close`).
+the run command of a human thread (`yank_run`), `K` peek the bead id under the cursor (`details`), `?` / `g?` help, `q` / `<Esc>` close (`close`).
 
 ### Peek floats (`gd`)
 
-`gd` on a bead id (detail VIEW, tree, thread float) opens that bead in a floating, read-only detail view with the same rendering and highlighting; it follows live updates (the watcher is held while any peek float is open). Floats stack, offset down and right; `gd` on a bead already open focuses it. `keymaps.detail.view.peek`, `keymaps.tree_view.peek` and `keymaps.thread.peek` set the `gd` key (`false` disables). In a float (`keymaps.peek.*`): `gd` peek (`peek`), `q` / `<Esc>` close the top float (`close`), `Q` close all (`close_all`), `<CR>` open the bead in the main window and close all (`open`), `yy` yank id (`yank_id`), `yr` yank run command (`yank_run`), `?` help (`help`).
+`gd` on a bead id (detail VIEW, tree, thread float) opens that bead in a floating, read-only detail view with the same rendering and highlighting; it follows live updates (the watcher is held while any peek float is open). Floats stack, offset down and right; `gd` on a bead already open focuses it. `keymaps.detail.view.peek`, `keymaps.tree_view.peek` and `keymaps.thread.peek` set the `gd` key (`false` disables). A float has the detail view's keys and they act on the float's bead: `e` / `i` open it in the main window in EDIT mode and close the floats (`edit`), `x` close (`close_bead`), `C` claim (`claim`), `n` note (`note`), `c` comment (`comment`), `a` ask (`ask`), `<CR>` on a question line opens its thread (`open_thread`), `]u` / `[u` jump between threads waiting for you (`next_waiting`, `prev_waiting`), `]b` / `[b` replace the float's bead in place with the next / previous bead in tree order (`next_bead`, `prev_bead`; a count works), `K` / `gd` peek the bead id under the cursor (`details`, `peek`), `yy` (`yank_id`), `yr` (`yank_run`), `?` / `g?` help (`help`). Keys come from `keymaps.detail.view.*`; `keymaps.peek.*` (same action names) overrides them for floats. Float-only keys: `q` / `<Esc>` close the top float (`close`), `Q` close all (`close_all`), `<CR>` elsewhere opens the bead in the main window and closes all (`open`). Actions that change the bead refresh the float.
 
 ### Tree
 

@@ -229,6 +229,9 @@ function M.open(dbuf, idx)
     if not p then
       return vim.notify("Beads: this thread has no proposal", vim.log.levels.WARN)
     end
+    if detail.is_float(dbuf) then
+      return vim.notify("Beads: a peek float is read-only; open the bead in the main window", vim.log.levels.WARN)
+    end
     local b = detail.snapshot(dbuf)
     local old = b and ({ title = b.title, description = b.description, design = b.design, acceptance = b.acceptance })[p.field]
     local prompt = ("Apply proposal to %s?\n- %s\n+ %s"):format(tostring(p.field), tostring(old or ""), tostring(p.value))
@@ -267,6 +270,9 @@ function M.open(dbuf, idx)
   end
   acts.peek = function()
     require("beads.views.peek").at_cursor(root)
+  end
+  acts.details = function()
+    require("beads.views.peek").at_cursor(root, true)
   end
   keys.bind(fbuf, "thread", acts)
   vim.api.nvim_create_autocmd("User", {

@@ -16,6 +16,11 @@ function M.snapshot(buf)
   return state[buf] and state[buf].bead
 end
 
+-- True when buf is a read-only peek float's buffer.
+function M.is_float(buf)
+  return state[buf] ~= nil and state[buf].reload ~= nil
+end
+
 function M.root(buf)
   return state[buf] and state[buf].root or cli.get_root()
 end
@@ -45,7 +50,11 @@ local function view_actions(buf)
       require("beads.store").mark_self_write(root)
       require("beads.store").refresh(root)
       if vim.api.nvim_buf_is_valid(buf) then
-        M.load(buf)
+        if state[buf] and state[buf].reload then
+          state[buf].reload() -- a peek float repaints itself
+        else
+          M.load(buf)
+        end
       end
     end
   end
@@ -128,6 +137,9 @@ local function view_actions(buf)
   end))
   acts.peek = function()
     require("beads.views.peek").at_cursor(M.root(buf))
+  end
+  acts.details = function()
+    require("beads.views.peek").at_cursor(M.root(buf), true)
   end
   acts.open_thread = function()
     local idx = M.thread_at(buf, vim.api.nvim_win_get_cursor(0)[1])
@@ -226,6 +238,17 @@ local function view_actions(buf)
     pcall(vim.cmd, "close")
   end
   return acts
+end
+
+-- The detail view's actions for a peek float buffer; `st` ({ root, bead, reload }) is its state:
+-- actions read st.bead / st.root and call st.reload(cb) to repaint after a change.
+function M.attach_float(buf, st)
+  state[buf] = st
+  return view_actions(buf)
+end
+
+function M.detach_float(buf)
+  state[buf] = nil
 end
 
 local attach_winbar
@@ -451,6 +474,9 @@ function M.refresh_threads(buf, cb)
   if not (st and st.bead) then
     return
   end
+  if st.reload then
+    return st.reload(cb)
+  end
   M.gather(st.root, st.bead.id, function(threads)
     local cur = state[buf]
     if not (vim.api.nvim_buf_is_valid(buf) and cur and cur.bead) then
@@ -494,6 +520,9 @@ local SECTION = { description = "Description", design = "Design", acceptance = "
 function M.apply_field(buf, field, value)
   if not vim.api.nvim_buf_is_valid(buf) then
     return "buffer is gone"
+  end
+  if state[buf] and state[buf].reload then
+    return "a peek float is read-only; open the bead in the main window"
   end
   value = tostring(value)
   if field == "title" or FRONT[field] then

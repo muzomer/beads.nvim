@@ -36,6 +36,12 @@ local function fallback()
   vim.api.nvim_feedkeys("gd", "n", false)
 end
 
+local function retitle(e)
+  if valid(e.win) then
+    vim.api.nvim_win_set_config(e.win, { title = " " .. e.id .. " ", title_pos = "left" })
+  end
+end
+
 local function geometry(n, lines)
   local width = 20
   for _, l in ipairs(lines) do
@@ -63,17 +69,23 @@ local function paint(e, bead)
   vim.api.nvim_win_set_config(e.win, { relative = "editor", width = g.width, height = g.height, row = g.row, col = g.col })
 end
 
-local function fetch(e)
-  require("beads.views.detail").fetch_bead(e.root, e.id, function(bead)
-    if not bead or not vim.api.nvim_buf_is_valid(e.buf) then
+local function fetch(e, cb)
+  local id = e.id
+  require("beads.views.detail").fetch_bead(e.root, id, function(bead)
+    if not bead or not vim.api.nvim_buf_is_valid(e.buf) or e.id ~= id then
       return
     end
     require("beads.views.detail").gather(e.root, bead.id, function(threads)
-      if not vim.api.nvim_buf_is_valid(e.buf) then
+      if not vim.api.nvim_buf_is_valid(e.buf) or e.id ~= id then
         return
       end
       bead.threads = threads
       paint(e, bead)
+      -- same event detail.refresh_threads fires: an open thread float repaints, progress clears its spinner
+      vim.api.nvim_exec_autocmds("User", { pattern = "BeadsThreadsRefreshed", data = e.buf, modeline = false })
+      if cb then
+        cb()
+      end
     end)
   end)
 end
@@ -158,7 +170,9 @@ local function main_win()
   end
 end
 
-local function open_in_main(e)
+M.edit_wait_ms = 6000 -- how long e / i wait for the main window to load the bead
+
+local function open_in_main(e, edit)
   local id, root = e.id, e.root
   local main = main_win()
   M.close_all()
@@ -167,30 +181,130 @@ local function open_in_main(e)
     main = vim.api.nvim_get_current_win()
   end
   vim.api.nvim_set_current_win(main)
-  require("beads.views.detail").edit(id, root)
+  local detail = require("beads.views.detail")
+  detail.edit(id, root)
+  if edit then
+    -- EDIT mode only once the async load has filled the buffer, or the load would overwrite typing
+    local buf = vim.api.nvim_get_current_buf()
+    local deadline = vim.uv.now() + (M.edit_wait_ms or 6000)
+    local function try()
+      if not vim.api.nvim_buf_is_valid(buf) then
+        return
+      end
+      local b = detail.snapshot(buf)
+      if b and b.id == id then
+        return detail.enter_edit(buf)
+      end
+      if vim.uv.now() >= deadline then
+        vim.notify("Beads: " .. id .. " did not load in time; staying in view mode", vim.log.levels.WARN)
+        return
+      end
+      vim.defer_fn(try, 20)
+    end
+    try()
+  end
+end
+
+-- ]b / [b: replaces the float's bead in place with the one `dir * count` steps away in tree order.
+local function step(e, dir)
+  local n = vim.v.count1
+  local function go()
+    if not (valid(e.win) and vim.api.nvim_buf_is_valid(e.buf)) then
+      return
+    end
+    local order = require("beads.views.tree").order(e.root)
+    local idx
+    for i, id in ipairs(order) do
+      if id == e.id then
+        idx = i
+      end
+    end
+    local target = idx and order[idx + dir * n]
+    if not target then
+      if dir > 0 then
+        vim.notify("Beads: no next bead", vim.log.levels.INFO)
+      else
+        vim.notify("Beads: no previous bead", vim.log.levels.INFO)
+      end
+      return
+    end
+    local bead = store.get(e.root).by_id[target]
+    if not bead then
+      return
+    end
+    for _, o in ipairs(stack) do
+      if o ~= e and o.id == target and o.root == e.root and valid(o.win) then
+        vim.api.nvim_set_current_win(o.win)
+        return
+      end
+    end
+    e.id = target
+    retitle(e)
+    paint(e, bead)
+    fetch(e)
+  end
+  if store.is_loaded(e.root) then
+    go()
+  else
+    store.refresh(e.root, go)
+  end
 end
 
 local function bind(e)
   local function cur()
     return e.bead or store.get(e.root).by_id[e.id]
   end
-  keys.bind(e.buf, "peek", {
-    peek = function()
-      M.at_cursor(e.root)
-    end,
-    close = M.close_top,
-    close_all = M.close_all,
-    open = function()
+  local detail = require("beads.views.detail")
+  e.reload = function(cb)
+    fetch(e, cb)
+  end
+  -- the detail view's own actions (close_bead, claim, note, comment, ask, ]u / [u, thread), acting on e.bead
+  local acts = detail.attach_float(e.buf, e)
+  local function thread_or_bead()
+    if not vim.api.nvim_buf_is_valid(e.buf) then
+      return
+    end
+    local idx = detail.thread_at(e.buf, vim.api.nvim_win_get_cursor(0)[1])
+    if idx then
+      require("beads.views.thread").open(e.buf, idx)
+    else
       open_in_main(e)
-    end,
-    yank_id = function()
-      workflow.yank(e.id)
-    end,
-    yank_run = function()
-      local b = cur()
-      if b then
-        workflow.yank(workflow.run_command(b))
-      end
+    end
+  end
+  acts.peek = function()
+    M.at_cursor(e.root)
+  end
+  acts.details = function()
+    M.at_cursor(e.root, true)
+  end
+  acts.edit = function()
+    open_in_main(e, true)
+  end
+  acts.next_bead = function()
+    step(e, 1)
+  end
+  acts.prev_bead = function()
+    step(e, -1)
+  end
+  acts.close = M.close_top
+  acts.close_all = M.close_all
+  acts.open_thread = thread_or_bead
+  acts.open = thread_or_bead
+  acts.yank_id = function()
+    workflow.yank(e.id)
+  end
+  acts.yank_run = function()
+    local b = cur()
+    if b then
+      workflow.yank(workflow.run_command(b))
+    end
+  end
+  keys.bind(e.buf, "peek", acts, { ask = { "n", "x" } })
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    buffer = e.buf,
+    once = true,
+    callback = function()
+      detail.detach_float(e.buf)
     end,
   })
 end
@@ -237,7 +351,7 @@ local function open(id, root)
     end,
   })
   e.unsub = store.subscribe(root, function(st)
-    local cur = st.by_id[id]
+    local cur = st.by_id[e.id]
     if cur and e.bead and cur.updated_at ~= e.bead.updated_at then
       fetch(e)
     end
@@ -253,10 +367,14 @@ function M.open(id, root)
 end
 
 -- gd: peeks the bead id under the cursor, or runs Vim's own gd.
-function M.at_cursor(root)
+-- With `quiet` (K) it does nothing off a bead id.
+function M.at_cursor(root, quiet)
   root = root or cli.get_root()
   local id = bead_at_cursor(root)
   if not id then
+    if quiet then
+      return
+    end
     return fallback()
   end
   open(id, root)
