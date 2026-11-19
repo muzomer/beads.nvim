@@ -341,7 +341,9 @@ local function restore_prev(v, win)
   end
   reset_win_opts(win)
   local pb = v.prev_buf
-  if pb and vim.api.nvim_buf_is_valid(pb) then
+  -- A buffer renamed since (the empty start buffer reused by `:edit beads://<id>`) is not what was there.
+  local renamed = pb and vim.api.nvim_buf_is_valid(pb) and not v.prev_was_beads and vim.api.nvim_buf_get_name(pb):match("^beads://")
+  if pb and vim.api.nvim_buf_is_valid(pb) and not renamed then
     if v.prev_listed then
       vim.bo[pb].buflisted = true
     end
@@ -606,6 +608,9 @@ local function close(tab)
     end
   elseif vim.api.nvim_win_is_valid(v.win) and #vim.api.nvim_tabpage_list_wins(tab) > 1 then
     pcall(vim.api.nvim_win_close, v.win, true)
+  elseif vim.api.nvim_win_is_valid(v.win) and vim.api.nvim_win_get_buf(v.win) == v.buf then
+    -- Last window: show the original buffer (or a fresh empty one) instead of whatever the delete falls back to.
+    restore_prev(v, v.win)
   end
   if vim.api.nvim_buf_is_valid(v.buf) then
     pcall(vim.api.nvim_buf_delete, v.buf, { force = true })
@@ -922,7 +927,7 @@ local function open(pos)
   setl(win, "foldtext", "v:lua.require'beads.views.tree'.foldtext()")
   setl(win, "foldlevel", 99)
   vim.bo[buf].shiftwidth = 2
-  local v = { win = win, buf = buf, pos = pos or "full", full = full, prev_buf = prev_buf, prev_listed = vim.bo[prev_buf].buflisted, root = root, show_closed = false, ids = {}, closed = {}, marked = {} }
+  local v = { win = win, buf = buf, pos = pos or "full", full = full, prev_buf = prev_buf, prev_was_beads = vim.api.nvim_buf_get_name(prev_buf):match("^beads://") ~= nil, prev_listed = vim.bo[prev_buf].buflisted, root = root, show_closed = false, ids = {}, closed = {}, marked = {} }
   views[tab] = v
   apply_layout(win, pos, v)
   v.release = require("beads.watch").acquire(root)
