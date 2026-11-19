@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# nbd: open the beads tree in nvim; quitting the tree quits nvim.
+# It needs no files of its own, so it can be linked into a PATH directory.
+#   nbd           beads of the current directory (the nearest .beads)
+#   nbd <dir>     beads of <dir>
+# Inside the tree: <CR> opens a bead (detail above, tree below), K peeks, q closes
+# the detail or, in the tree, closes it and quits nvim. A detail with unsaved
+# edits keeps nvim open so nothing is lost.
+set -euo pipefail
+
+if [[ $# -gt 0 ]]; then
+  cd "$1"
+fi
+
+lua=$(mktemp --suffix=.lua)
+trap 'rm -f "$lua"' EXIT
+cat >"$lua" <<'EOF'
+local group = vim.api.nvim_create_augroup("nbd", { clear = true })
+local function tree_open()
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(b) and vim.bo[b].filetype == "beads-tree" then
+      return true
+    end
+  end
+  return false
+end
+-- Watch every tree buffer (also replacements). Quit only when, at run time, no tree is left.
+vim.api.nvim_create_autocmd("FileType", {
+  group = group,
+  pattern = "beads-tree",
+  callback = function(args)
+    vim.api.nvim_create_autocmd("BufWipeout", {
+      group = group,
+      buffer = args.buf,
+      once = true,
+      callback = function()
+        vim.schedule(function()
+          if not tree_open() then
+            pcall(vim.cmd, "qa")
+          end
+        end)
+      end,
+    })
+  end,
+})
+vim.cmd("Beads tree")
+EOF
+
+# NBD_NVIM lets tests swap the nvim command (for example a headless one).
+# Backslash-escape the Ex-special characters of the path (a plain path stays as is).
+lua_ex=$(printf '%s' "$lua" | sed 's/[] %#\\|"'"'"'<>*?{}$`&;()![]/\\&/g')
+# shellcheck disable=SC2086
+${NBD_NVIM:-nvim} -c "luafile $lua_ex"

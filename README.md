@@ -99,6 +99,25 @@ is watched and the Questions section, thread floats and badges refresh. Each age
 
 Multi-select: `<Tab>` toggles a selection, `ctrl-a` opens the action menu for the selected beads. `ctrl-y` and `alt-r` yank every selected id / run command, one per line; `ctrl-x` closes all selected; `<CR>` opens the first selection and notes how many others were ignored.
 
+## nbd: open the tree from the shell
+
+`bin/nbd` starts nvim on the beads tree and quits nvim when the tree closes.
+
+```sh
+nbd          # beads of the current directory (the nearest .beads)
+nbd <dir>    # beads of <dir>
+```
+
+The plugin's `bin/` is only added to nvim's own PATH, so put `nbd` on your shell PATH yourself:
+
+```sh
+ln -s <plugin>/bin/nbd ~/.local/bin/nbd
+```
+
+Quit behaviour: `q` in the tree closes it and nvim quits with it. A detail buffer with unsaved edits
+makes the quit fail, so nvim stays open and nothing is lost. `NBD_NVIM` overrides the nvim command.
+Your config must load beads.nvim as usual; nbd needs no other setup.
+
 ## Statusline
 
 `require("beads").status()` returns a short string such as `◐ 2  ○ 5 ready  💬 1`
