@@ -284,7 +284,11 @@ local function qfire(root, st)
   if st.stopped then
     return
   end
-  local ok, threads = pcall(require("beads.questions.store").list, root)
+  local qs = require("beads.questions.store")
+  if not qs.readable(root) then
+    return -- keep the previous snapshot; the next good read compares against it
+  end
+  local ok, threads = pcall(qs.list, root)
   local old, new = st.qsnap or {}, {}
   local cfg = require("beads").config
   for _, t in ipairs(ok and threads or {}) do

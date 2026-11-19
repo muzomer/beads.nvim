@@ -155,6 +155,29 @@ local function find(threads, tid)
   end
 end
 
+-- False when questions.json exists but cannot be read or parsed (a missing file is fine; an empty one is a half-written read).
+function M.readable(root)
+  local path = file_of(root)
+  if not uv.fs_stat(path) then
+    return true
+  end
+  local s = read_all(path)
+  if s == nil then
+    return false
+  end
+  if s == "" then
+    return false
+  end
+  local ok, data = pcall(vim.json.decode, s)
+  if not ok or type(data) ~= "table" then
+    return false
+  end
+  if type(data.threads) == "table" then
+    data = data.threads
+  end
+  return next(data) == nil or vim.islist(data)
+end
+
 function M.list(root, filter)
   filter = filter or {}
   local out = {}

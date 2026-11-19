@@ -95,7 +95,7 @@ function M.deliver(root, prompt, note)
     if pok then
       return
     end
-    vim.notify("Beads: agent-poke failed: " .. (tostring(err):match("[^\n]*") or ""), vim.log.levels.WARN)
+    vim.notify("Beads: agent-poke failed: " .. (tostring(err):match("[^\n%s][^\n]*") or ""), vim.log.levels.WARN)
   end
   vim.fn.setreg('"', prompt)
   vim.notify(

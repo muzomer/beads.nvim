@@ -102,11 +102,18 @@ function M.open(dbuf, idx)
     end
     require("beads.views.input").open({
       title = "Reply " .. t.bead .. " " .. t.id,
-      on_submit = function(text)
+      on_submit = function(text, send)
         if t.human then
           human.answer(root, t.bead, text, function(res)
             if res.err then
               fail(res.err)
+            elseif send then
+              local prompt = ("Human answer on %s: %s\nRead the bead notes with bd show %s and continue."):format(
+                t.bead,
+                text,
+                t.bead
+              )
+              require("beads.workflow").deliver(root, prompt, "answer stored.")
             end
             refresh()
           end)
@@ -114,6 +121,16 @@ function M.open(dbuf, idx)
           local ok, err = pcall(qstore.reply, root, t.id, "user", text)
           if not ok then
             fail(tostring(err))
+          elseif err == nil then
+            vim.notify("Beads: thread " .. t.id .. " is gone; reply not stored", vim.log.levels.WARN)
+          elseif send then
+            local prompt = ("Reply on %s thread %s: %s\nRead it with beads-ask and answer with beads-ask reply %s."):format(
+              t.bead,
+              t.id,
+              text,
+              t.id
+            )
+            require("beads.workflow").deliver(root, prompt, "reply stored.")
           end
           refresh()
         end
