@@ -174,7 +174,7 @@ describe("beads opened from the tree use the tree's root", function()
       A .. "/.fake/show-ta-9.json"
     )
     cli.set_root(nil)
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     if vim.fn.exists("#BeadsDetail#BufReadCmd") == 0 then
       vim.cmd.source(repo .. "/plugin/beads.lua")
     end

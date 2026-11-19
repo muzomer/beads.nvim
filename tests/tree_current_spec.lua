@@ -253,7 +253,7 @@ local function flash_on_cursor(win)
 end
 
 local function setup_plugin(opts)
-  require("beads").setup(opts or {})
+  require("beads").setup(vim.tbl_deep_extend("keep", opts or {}, { tree = { layout = "split" } }))
 end
 
 describe("tree current bead, reveal and jump flash", function()

@@ -221,7 +221,7 @@ describe(":Beads tree mouse", function()
     if vim.fn.exists(":Beads") ~= 2 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     orig_columns, orig_lines = vim.o.columns, vim.o.lines
     vim.o.columns, vim.o.lines = 200, 50
     orig_path = vim.env.PATH
@@ -262,7 +262,7 @@ describe(":Beads tree mouse", function()
     vim.fn.delete(bin_dir, "rf")
     vim.fn.delete(fake_dir, "rf")
     vim.o.columns, vim.o.lines = orig_columns, orig_lines
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   it("mouse defaults to on: <LeftMouse> and <2-LeftMouse> are mapped in the tree", function()
@@ -322,7 +322,7 @@ describe(":Beads tree mouse", function()
   end)
 
   it("mouse = false installs no mouse maps in the tree (passes already)", function()
-    require("beads").setup({ mouse = false })
+    require("beads").setup({ tree = { layout = "split" }, mouse = false })
     local tree = open_tree()
     local buf = vim.api.nvim_win_get_buf(tree)
     local got = mouse_maps(buf)
@@ -333,7 +333,7 @@ describe(":Beads tree mouse", function()
   end)
 
   it("mouse = false: a click on the title only moves the cursor (passes already)", function()
-    require("beads").setup({ mouse = false })
+    require("beads").setup({ tree = { layout = "split" }, mouse = false })
     local tree = open_tree()
     local rb = row_of(tree, "ch-b")
     click(tree, rb, at(tree, rb, "Child bravo") + 2)

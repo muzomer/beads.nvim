@@ -70,6 +70,8 @@ the run command of a human thread (`yank_run`), `?` / `g?` help, `q` / `<Esc>` c
 
 ### Tree
 
+`tree.layout` picks the default view. `"full"` (the default): the tree fills the current window (like a file explorer); `<CR>` or a click on a bead opens its detail in a window above and the tree below (`tree.height`, default about 40% of the lines), and closing the detail (`q`) returns to the tree only; `K` shows the details float without changing the layout; closing the tree restores the window's previous buffer. `"split"`: the tree opens as a split at `tree.position` and `<CR>` opens the bead in the other window. `:Beads tree left|right|bottom|top` always opens a split.
+
 `tree.width` (left/right) and `tree.height` (bottom/top) default to `"auto"`: the tree fits its longest visible line (at least 24 columns) or its visible row count (at least 6), refitting after every render and on `VimResized`. `tree.max_width` (default half the columns) and `tree.max_height` (default 40% of the lines) cap the auto size. A number keeps a fixed size. Resizing the tree window by hand stops auto-fit until the tree is reopened.
 
 `keymaps.tree_view.*`: `<CR>` open, `a` add child, `x` close, `C` claim, `R` refresh, `H` toggle closed, `L` cycle the layout (left, bottom, right, top), `f` filter (free text plus `status:`, `label:`, `assignee:`, `type:` tokens; empty clears), `s` cycle the sort (priority, updated, id),

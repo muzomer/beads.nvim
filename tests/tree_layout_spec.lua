@@ -220,7 +220,7 @@ describe(":Beads tree layout", function()
     if vim.fn.exists(":Beads") ~= 2 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     orig_columns, orig_lines = vim.o.columns, vim.o.lines
     vim.o.columns, vim.o.lines = 120, 40
     orig_path = vim.env.PATH
@@ -270,7 +270,7 @@ describe(":Beads tree layout", function()
     vim.fn.delete(bin_dir, "rf")
     vim.fn.delete(fake_dir, "rf")
     vim.o.columns, vim.o.lines = orig_columns, orig_lines
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   describe("opening at each position with the default size", function()
@@ -311,7 +311,7 @@ describe(":Beads tree layout", function()
 
   describe("explicit sizes", function()
     it("width is honoured on the left and right", function()
-      require("beads").setup({ tree = { width = 37 } })
+      require("beads").setup({ tree = { layout = "split", width = 37 } })
       vim.cmd("Beads tree right")
       assert_at("right", 37)
       vim.cmd("Beads tree left")
@@ -319,7 +319,7 @@ describe(":Beads tree layout", function()
     end)
 
     it("height is honoured at the bottom and top", function()
-      require("beads").setup({ tree = { height = 9 } })
+      require("beads").setup({ tree = { layout = "split", height = 9 } })
       vim.cmd("Beads tree bottom")
       assert_at("bottom", 9)
       vim.cmd("Beads tree top")
@@ -449,7 +449,7 @@ describe(":Beads tree layout", function()
     end)
 
     it("keymaps.tree_view.layout rebinds the cycle key", function()
-      require("beads").setup({ keymaps = { tree_view = { layout = "gL" } } })
+      require("beads").setup({ tree = { layout = "split" }, keymaps = { tree_view = { layout = "gL" } } })
       vim.cmd("Beads tree left")
       wait_rendered("bl-d")
       press("gL")

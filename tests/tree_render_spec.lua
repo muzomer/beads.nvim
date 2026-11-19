@@ -156,7 +156,7 @@ describe("tree rendering", function()
     if vim.fn.exists(":Beads") ~= 2 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     orig_columns = vim.o.columns
     vim.o.columns = 200
     orig_path = vim.env.PATH
@@ -202,7 +202,7 @@ describe("tree rendering", function()
     vim.fn.delete(bin_dir, "rf")
     vim.fn.delete(fake_dir, "rf")
     vim.o.columns = orig_columns
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   it("golden: nested epics render guides, fold markers and epic progress", function()
@@ -467,7 +467,7 @@ describe("tree rendering", function()
   end)
 
   it("the empty state names the configured create key", function()
-    require("beads").setup({ keymaps = { create = "<leader>bX" } })
+    require("beads").setup({ tree = { layout = "split" }, keymaps = { create = "<leader>bX" } })
     new_root(true)
     set_list({})
     local tree = open_tree()

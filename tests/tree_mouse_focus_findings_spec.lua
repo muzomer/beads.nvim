@@ -123,7 +123,7 @@ describe(":Beads tree mouse (findings 4u9.11)", function()
     if vim.fn.exists(":Beads") ~= 2 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     orig_columns, orig_lines = vim.o.columns, vim.o.lines
     vim.o.columns, vim.o.lines = 200, 50
     orig_path = vim.env.PATH
@@ -164,7 +164,7 @@ describe(":Beads tree mouse (findings 4u9.11)", function()
     vim.fn.delete(bin_dir, "rf")
     vim.fn.delete(fake_dir, "rf")
     vim.o.columns, vim.o.lines = orig_columns, orig_lines
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   -- finding lua/beads/views/tree.lua:532: the tree's <LeftMouse> map swallows clicks outside the tree.

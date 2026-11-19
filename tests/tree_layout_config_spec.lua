@@ -76,11 +76,11 @@ describe("tree.position config", function()
     vim.env.PATH = orig_path
     vim.fn.delete(bin_dir, "rf")
     vim.o.columns, vim.o.lines = orig_columns, orig_lines
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   it("a plain :Beads tree opens at the configured position", function()
-    require("beads").setup({ tree = { position = "right" } })
+    require("beads").setup({ tree = { layout = "split", position = "right" } })
     local main = vim.api.nvim_get_current_win()
     vim.cmd("Beads tree")
     local tree

@@ -318,10 +318,62 @@ local function clamp(n, lo, hi)
   return math.max(lo, math.min(hi, n))
 end
 
+local TREE_WIN_OPTS = { "foldmethod", "foldexpr", "foldtext", "foldlevel", "wrap", "number", "relativenumber", "signcolumn", "winfixheight", "winfixwidth" }
+
+-- Sets a window option with local scope (like :setlocal) so the global value stays the user's.
+local function setl(win, name, value)
+  pcall(vim.api.nvim_set_option_value, name, value, { scope = "local", win = win })
+end
+
+-- Gives the window the user's own values back (:setlocal x<).
+local function reset_win_opts(win)
+  if vim.api.nvim_win_is_valid(win) then
+    vim.api.nvim_win_call(win, function()
+      vim.cmd("setlocal " .. table.concat(TREE_WIN_OPTS, "< ") .. "<")
+    end)
+  end
+end
+
+-- Shows the buffer the tree replaced in `win`: re-listed if it was listed, a new buffer if it is gone.
+local function restore_prev(v, win)
+  if not vim.api.nvim_win_is_valid(win) then
+    return
+  end
+  reset_win_opts(win)
+  local pb = v.prev_buf
+  if pb and vim.api.nvim_buf_is_valid(pb) then
+    if v.prev_listed then
+      vim.bo[pb].buflisted = true
+    end
+    if pcall(vim.api.nvim_win_set_buf, win, pb) then
+      return
+    end
+  end
+  vim.api.nvim_win_call(win, function()
+    vim.cmd("enew")
+  end)
+end
+
+local function detail_modified(v)
+  if not (v.dwin and vim.api.nvim_win_is_valid(v.dwin)) then
+    return false
+  end
+  return vim.bo[vim.api.nvim_win_get_buf(v.dwin)].modified
+end
+
 -- Sizes the tree window for `pos`: a number in tree.width/height is fixed, "auto" fits the visible content.
 -- v.fit records the size the plugin set, so a WinResized with another size is recognised as a manual resize.
 function apply_layout(win, pos, v)
   local cfg = require("beads").config.tree or {}
+  if v and v.full then
+    -- Full layout: the tree fills its window until a detail window opens above it.
+    if not (v.dwin and vim.api.nvim_win_is_valid(v.dwin)) then
+      setl(win, "winfixheight", false)
+      v.fit = nil
+      return
+    end
+    pos = "bottom"
+  end
   local horizontal = pos == "left" or pos == "right"
   local setting = horizontal and cfg.width or cfg.height
   if setting == nil then
@@ -353,17 +405,17 @@ function apply_layout(win, pos, v)
     end
   end
   if horizontal then
-    vim.wo[win].winfixheight = false
+    setl(win, "winfixheight", false)
     if size then
       vim.api.nvim_win_set_width(win, size)
     end
-    vim.wo[win].winfixwidth = true
+    setl(win, "winfixwidth", true)
   else
-    vim.wo[win].winfixwidth = false
+    setl(win, "winfixwidth", false)
     if size then
       vim.api.nvim_win_set_height(win, size)
     end
-    vim.wo[win].winfixheight = true
+    setl(win, "winfixheight", true)
   end
   if v and size then
     v.fit = horizontal and vim.api.nvim_win_get_width(win) or vim.api.nvim_win_get_height(win)
@@ -535,7 +587,24 @@ local function close(tab)
   if v.release then
     v.release()
   end
-  if vim.api.nvim_win_is_valid(v.win) and #vim.api.nvim_tabpage_list_wins(tab) > 1 then
+  if v.full then
+    if detail_modified(v) then
+      -- Never force-close a detail with unsaved edits: it stays, the tree goes.
+      vim.notify("Beads: the detail window has unsaved edits and stays open; the tree closed", vim.log.levels.WARN)
+      if vim.api.nvim_win_is_valid(v.win) and vim.api.nvim_win_get_buf(v.win) == v.buf then
+        v.dwin = nil
+        pcall(vim.api.nvim_win_close, v.win, true)
+      end
+    else
+      if v.dwin and vim.api.nvim_win_is_valid(v.dwin) then
+        pcall(vim.api.nvim_win_close, v.dwin, true)
+      end
+      if vim.api.nvim_win_is_valid(v.win) and vim.api.nvim_win_get_buf(v.win) == v.buf then
+        setl(v.win, "winfixheight", false)
+        restore_prev(v, v.win)
+      end
+    end
+  elseif vim.api.nvim_win_is_valid(v.win) and #vim.api.nvim_tabpage_list_wins(tab) > 1 then
     pcall(vim.api.nvim_win_close, v.win, true)
   end
   if vim.api.nvim_buf_is_valid(v.buf) then
@@ -543,7 +612,43 @@ local function close(tab)
   end
 end
 
+-- The window a bead opens in: the previous window (split layouts); in the full layout the detail
+-- window above the tree, created on first use. Returns nil when there is none.
 local function prev_win(v)
+  if v.full then
+    if v.dwin and vim.api.nvim_win_is_valid(v.dwin) then
+      return v.dwin
+    end
+    if not vim.api.nvim_win_is_valid(v.win) then
+      return nil
+    end
+    vim.api.nvim_set_current_win(v.win)
+    vim.cmd("aboveleft split")
+    local dwin = vim.api.nvim_get_current_win()
+    reset_win_opts(dwin)
+    v.dwin = dwin
+    vim.api.nvim_create_autocmd("WinClosed", {
+      pattern = tostring(dwin),
+      once = true,
+      callback = function()
+        local was_current = vim.api.nvim_get_current_win() == dwin
+        if v.dwin == dwin then
+          v.dwin = nil
+        end
+        v.fit = nil -- before WinResized sees the tree grow: that is not a manual resize
+        vim.schedule(function()
+          if not vim.api.nvim_win_is_valid(v.win) or vim.api.nvim_win_get_buf(v.win) ~= v.buf then
+            return
+          end
+          apply_layout(v.win, v.pos, v)
+          if was_current then
+            pcall(vim.api.nvim_set_current_win, v.win)
+          end
+        end)
+      end,
+    })
+    return dwin
+  end
   local pw = vim.fn.win_getid(vim.fn.winnr("#"))
   if pw ~= 0 and pw ~= v.win and vim.api.nvim_win_is_valid(pw) then
     return pw
@@ -639,6 +744,7 @@ local function setup_keys(v, tab)
     end
     vim.api.nvim_set_current_win(pw)
     require("beads.views.detail").edit(id, v.root)
+    apply_layout(v.win, v.pos, v)
     require("beads.flash").flash()
   end))
   map("add_child", with_id(function(id)
@@ -648,6 +754,7 @@ local function setup_keys(v, tab)
     end
     vim.api.nvim_set_current_win(pw)
     require("beads.views.detail").create_child(id, v.root)
+    apply_layout(v.win, v.pos, v)
   end))
   map("close_bead", function()
     act("close")
@@ -799,19 +906,23 @@ local function open(pos)
   vim.bo[buf].bufhidden = "wipe"
   vim.bo[buf].swapfile = false
   vim.bo[buf].filetype = "beads-tree"
-  vim.cmd(SPLIT[pos])
+  local full = pos == nil
+  local prev_buf = vim.api.nvim_get_current_buf()
+  if not full then
+    vim.cmd(SPLIT[pos])
+  end
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, buf)
-  vim.wo[win].wrap = false
-  vim.wo[win].number = false
-  vim.wo[win].relativenumber = false
-  vim.wo[win].signcolumn = "no"
-  vim.wo[win].foldmethod = "expr"
-  vim.wo[win].foldexpr = "v:lua.require'beads.views.tree'.foldexpr(v:lnum)"
-  vim.wo[win].foldtext = "v:lua.require'beads.views.tree'.foldtext()"
-  vim.wo[win].foldlevel = 99
+  setl(win, "wrap", false)
+  setl(win, "number", false)
+  setl(win, "relativenumber", false)
+  setl(win, "signcolumn", "no")
+  setl(win, "foldmethod", "expr")
+  setl(win, "foldexpr", "v:lua.require'beads.views.tree'.foldexpr(v:lnum)")
+  setl(win, "foldtext", "v:lua.require'beads.views.tree'.foldtext()")
+  setl(win, "foldlevel", 99)
   vim.bo[buf].shiftwidth = 2
-  local v = { win = win, buf = buf, pos = pos, root = root, show_closed = false, ids = {}, closed = {}, marked = {} }
+  local v = { win = win, buf = buf, pos = pos or "full", full = full, prev_buf = prev_buf, prev_listed = vim.bo[prev_buf].buflisted, root = root, show_closed = false, ids = {}, closed = {}, marked = {} }
   views[tab] = v
   apply_layout(win, pos, v)
   v.release = require("beads.watch").acquire(root)
@@ -827,12 +938,27 @@ local function open(pos)
   vim.api.nvim_create_autocmd({ "BufWipeout", "WinClosed" }, {
     buffer = buf,
     once = true,
-    callback = function()
+    callback = function(args)
       fold_info[buf] = nil
       if views[tab] == v then
         views[tab] = nil
         v.unsub()
         v.release()
+        if v.full and args.event == "WinClosed" and tonumber(args.match) == vim.api.nvim_get_current_win() then
+          -- The user closed the tree window itself (:close, <C-w>c): undo the layout.
+          local closed = tonumber(args.match)
+          vim.schedule(function()
+            local dwin = v.dwin
+            if not (dwin and vim.api.nvim_win_is_valid(dwin)) then
+              return
+            end
+            if detail_modified(v) then
+              vim.notify("Beads: the detail window has unsaved edits and stays open; the tree closed", vim.log.levels.WARN)
+              return
+            end
+            restore_prev(v, dwin)
+          end)
+        end
       end
     end,
   })
@@ -864,6 +990,9 @@ local function open(pos)
 end
 
 local function resolve(pos)
+  if pos == nil and (require("beads").config.tree or {}).layout ~= "split" then
+    return nil
+  end
   if pos and not vim.tbl_contains(POSITIONS, pos) then
     vim.notify("Beads: tree position must be left, right, bottom or top", vim.log.levels.ERROR)
     return nil
@@ -893,19 +1022,22 @@ function M.toggle(pos)
     close(tab)
     return
   end
-  pos = resolve(pos)
-  if not pos then
-    return
+  local full = pos == nil and (require("beads").config.tree or {}).layout ~= "split"
+  if not full then
+    pos = resolve(pos)
+    if not pos then
+      return
+    end
+    last_position = pos
   end
-  last_position = pos
-  if live then
+  if live and not full and not v.full then
     move(v, pos)
     return
   end
   if v then
     close(tab)
   end
-  open(pos)
+  open(not full and pos or nil)
 end
 
 function M.cycle(tab)

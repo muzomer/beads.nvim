@@ -99,7 +99,7 @@ describe("tree group actions integration (real bd)", function()
         if vim.fn.exists(":Beads") == 0 then
           vim.cmd.source(root .. "/plugin/beads.lua")
         end
-        require("beads").setup({ fzf = false })
+        require("beads").setup({ tree = { layout = "split" }, fzf = false })
         H.open_tree(ids.c)
         fn(dir, ids)
       end)
@@ -109,7 +109,7 @@ describe("tree group actions integration (real bd)", function()
       vim.env.PATH = orig_path
       cli.set_root(nil)
       vim.cmd.cd(vim.fn.fnameescape(cwd))
-      require("beads").setup({})
+      require("beads").setup({ tree = { layout = "split" } })
       vim.fn.delete(shim, "rf")
       if not ok then
         error(err, 0)

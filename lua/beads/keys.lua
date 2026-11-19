@@ -215,7 +215,7 @@ local HEADINGS = {
 local MODES = { tree_view = "tree", detail_view = "view", detail_edit = "edit", thread = "thread", peek = "peek", input = "input" }
 
 local EXTRA = {
-  tree_view = { "za/zo/zc  fold" },
+  tree_view = { "za/zo/zc  fold", "tree.layout  \"full\" (default): tree fills the window, <CR> opens the bead above it; \"split\": side split" },
 }
 
 local function lines_for(group)

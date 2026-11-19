@@ -104,6 +104,7 @@ describe(":Beads tree with closed parents", function()
     if vim.fn.exists(":Beads") ~= 2 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
+    require("beads").setup({ tree = { layout = "split" } })
     orig_columns = vim.o.columns
     vim.o.columns = 200
     orig_path = vim.env.PATH

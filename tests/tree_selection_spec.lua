@@ -397,7 +397,7 @@ describe("tree selection and group actions", function()
     if vim.fn.exists(":Beads") == 0 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     tree_win = nil
     open_tree()
   end)
@@ -418,7 +418,7 @@ describe("tree selection and group actions", function()
     cli.set_root(nil)
     vim.cmd.cd(vim.fn.fnameescape(plugin_root))
     vim.fn.delete(dir, "rf")
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   -- ── marks ────────────────────────────────────────────────────────────────────────────────────

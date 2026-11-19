@@ -171,6 +171,7 @@ describe("waiting state in tree and detail", function()
 
   before_each(function()
     fake.setup()
+    require("beads").setup({ tree = { layout = "split" } })
     ids = fake.write_threads()
   end)
 

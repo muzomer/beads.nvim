@@ -211,7 +211,7 @@ describe("group set values: remove-dependency targets and epic picker choices", 
     if vim.fn.exists(":Beads") == 0 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({ fzf = false })
+    require("beads").setup({ tree = { layout = "split" }, fzf = false })
     H.open_tree("t-4")
   end)
 

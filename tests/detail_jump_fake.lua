@@ -105,7 +105,7 @@ function M.setup(opts)
   if vim.fn.exists(":Beads") ~= 2 then
     vim.cmd.source(M.plugin_root .. "/plugin/beads.lua")
   end
-  require("beads").setup(opts or {})
+  require("beads").setup(vim.tbl_deep_extend("keep", opts or {}, { tree = { layout = "split" } }))
   state.orig_columns = vim.o.columns
   state.orig_lines = vim.o.lines
   vim.o.columns = 200

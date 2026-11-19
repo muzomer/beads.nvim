@@ -43,7 +43,7 @@ describe("group set assignee with a single quote (real bd)", function()
         if vim.fn.exists(":Beads") == 0 then
           vim.cmd.source(root .. "/plugin/beads.lua")
         end
-        require("beads").setup({ fzf = false })
+        require("beads").setup({ tree = { layout = "split" }, fzf = false })
         H.open_tree(ids[3])
         fn(dir, ids)
       end)
@@ -52,7 +52,7 @@ describe("group set assignee with a single quote (real bd)", function()
       H.restore()
       cli.set_root(nil)
       vim.cmd.cd(vim.fn.fnameescape(cwd))
-      require("beads").setup({})
+      require("beads").setup({ tree = { layout = "split" } })
       if not ok then
         error(err, 0)
       end

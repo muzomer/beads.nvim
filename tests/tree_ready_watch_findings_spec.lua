@@ -109,7 +109,7 @@ describe("tree header ready count with the fs watcher", function()
     if vim.fn.exists(":Beads") ~= 2 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     orig_columns = vim.o.columns
     vim.o.columns = 200
     orig_notify = vim.notify
@@ -152,7 +152,7 @@ describe("tree header ready count with the fs watcher", function()
     vim.fn.delete(root, "rf")
     root = nil
     vim.o.columns = orig_columns
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   it("a slow bd ready (manifest rewritten after the quiet window) does not start a refresh loop", function()

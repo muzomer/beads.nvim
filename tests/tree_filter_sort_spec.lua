@@ -253,7 +253,7 @@ describe(":Beads tree filter and sort", function()
     if vim.fn.exists(":Beads") ~= 2 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     orig_columns = vim.o.columns
     vim.o.columns = 200
     orig_input = vim.ui.input
@@ -299,7 +299,7 @@ describe(":Beads tree filter and sort", function()
     vim.fn.delete(bin_dir, "rf")
     vim.fn.delete(fake_dir, "rf")
     vim.o.columns = orig_columns
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   describe("filter", function()
@@ -420,7 +420,7 @@ describe(":Beads tree filter and sort", function()
     end)
 
     it("keymaps.tree_view.filter remaps the key", function()
-      require("beads").setup({ keymaps = { tree_view = { filter = "<F8>" } } })
+      require("beads").setup({ tree = { layout = "split" }, keymaps = { tree_view = { filter = "<F8>" } } })
       local tree = ready_tree("gc-z")
       local buf = vim.api.nvim_win_get_buf(tree)
       assert.is_not_nil(buf_map(buf, "<F8>"), "<F8> not mapped in the tree")
@@ -483,7 +483,7 @@ describe(":Beads tree filter and sort", function()
     end)
 
     it("keymaps.tree_view.sort remaps the key", function()
-      require("beads").setup({ keymaps = { tree_view = { sort = "<F9>" } } })
+      require("beads").setup({ tree = { layout = "split" }, keymaps = { tree_view = { sort = "<F9>" } } })
       local tree = ready_tree("sb-c")
       local buf = vim.api.nvim_win_get_buf(tree)
       assert.is_not_nil(buf_map(buf, "<F9>"), "<F9> not mapped in the tree")

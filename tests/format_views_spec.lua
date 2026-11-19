@@ -133,7 +133,7 @@ describe("shared formatter in views", function()
 
   it("tree and picker lines for the same bead are identical apart from tree prefixes", function()
     no_fzf()
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     stub_select()
     local picked = select_lines("Beads list")
     tree = open_tree()
@@ -163,7 +163,7 @@ describe("shared formatter in views", function()
 
   it("vim.ui.select entries are plain formatter text without ANSI codes", function()
     no_fzf()
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     stub_select()
     local picked = select_lines("Beads list")
     local F = require("beads.ui.format")
@@ -177,7 +177,7 @@ describe("shared formatter in views", function()
   it("fzf entries carry ANSI colours matching the formatter ranges", function()
     package.preload["fzf-lua"] = nil
     package.loaded["fzf-lua"] = FAKE_FZF
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     assert.is_true(require("beads").config.fzf)
     vim.o.termguicolors = true
     vim.api.nvim_set_hl(0, "BeadsId", { fg = 0x112233 })

@@ -1,5 +1,5 @@
 -- Interface under test (bead beads_nvim-ge7.16, adapted for beads_nvim-4gx.8 with owner approval):
---   require("beads").setup({ keymaps = { ... } }) configures the maps; false removes a map.
+--   require("beads").setup({ tree = { layout = "split" }, keymaps = { ... } }) configures the maps; false removes a map.
 --   Action names used here (others are the implementer's choice):
 --     keymaps.tree_view.refresh     (default "R")   -- buffer-local tree keys
 --     keymaps.tree_view.yank_id     (default "yy")
@@ -150,7 +150,7 @@ describe("beads keymaps", function()
   end)
 
   it("overriding a tree key changes the mapping", function()
-    require("beads").setup({ keymaps = { tree_view = { refresh = "<F5>" } } })
+    require("beads").setup({ tree = { layout = "split" }, keymaps = { tree_view = { refresh = "<F5>" } } })
     local _, buf = open_tree()
     local km = buf_map(buf, "n", "<F5>")
     assert.is_not_nil(km, "overridden refresh key <F5> is not mapped in the tree buffer")
@@ -159,7 +159,7 @@ describe("beads keymaps", function()
   end)
 
   it("g? in the tree opens a float listing the overridden key, not the default", function()
-    require("beads").setup({ keymaps = { tree_view = { refresh = "<F5>" } } })
+    require("beads").setup({ tree = { layout = "split" }, keymaps = { tree_view = { refresh = "<F5>" } } })
     local win = open_tree()
     local f = press_for_float(win, "g?")
     assert.is_not_nil(f, "g? in the tree opened no floating window")
@@ -177,21 +177,21 @@ describe("beads keymaps", function()
   end)
 
   it("setting a tree key to false removes the mapping", function()
-    require("beads").setup({ keymaps = { tree_view = { yank_id = false } } })
+    require("beads").setup({ tree = { layout = "split" }, keymaps = { tree_view = { yank_id = false } } })
     local _, buf = open_tree()
     assert.is_nil(buf_map(buf, "n", "yy"), "yy still mapped in tree with keymaps.tree_view.yank_id = false")
     assert.is_not_nil(buf_map(buf, "n", "R"), "other tree keys were lost")
   end)
 
   it("setting a detail key to false removes the mapping", function()
-    require("beads").setup({ keymaps = { detail = { view = { claim = false } } } })
+    require("beads").setup({ tree = { layout = "split" }, keymaps = { detail = { view = { claim = false } } } })
     local _, buf = open_detail("op-a")
     assert.is_nil(buf_map(buf, "n", "C"), "C still mapped in detail with keymaps.detail.view.claim = false")
     assert.is_not_nil(buf_map(buf, "n", "x"), "other detail keys were lost")
   end)
 
   it("every buffer-local map in tree, detail, note/comment floats and help floats has a desc", function()
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     local twin, tbuf = open_tree()
     assert_all_desc(tbuf, "tree")
     vim.cmd("wincmd l")
@@ -219,7 +219,7 @@ describe("beads keymaps", function()
   end)
 
   it("sets exactly the documented global keymaps, each with a desc, and never <leader>bd", function()
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     local twin = open_tree()
     close_float(press_for_float(twin, "g?"))
     vim.cmd("wincmd l")

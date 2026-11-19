@@ -188,7 +188,7 @@ describe(":Beads tree folding", function()
     if vim.fn.exists(":Beads") ~= 2 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     orig_columns = vim.o.columns
     vim.o.columns = 200
     orig_path = vim.env.PATH
@@ -226,7 +226,7 @@ describe(":Beads tree folding", function()
     vim.fn.delete(bin_dir, "rf")
     vim.fn.delete(fake_dir, "rf")
     vim.o.columns = orig_columns
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   it("folding a sub-epic hides exactly its descendants", function()
@@ -286,7 +286,7 @@ describe(":Beads tree folding", function()
   end)
 
   it("keymaps.tree_view.fold remaps the toggle", function()
-    require("beads").setup({ keymaps = { tree_view = { fold = "<F7>" } } })
+    require("beads").setup({ tree = { layout = "split" }, keymaps = { tree_view = { fold = "<F7>" } } })
     local tree = ready_tree()
     local buf = vim.api.nvim_win_get_buf(tree)
     assert.is_not_nil(buf_map(buf, "<F7>"), "<F7> not mapped in the tree")
@@ -301,7 +301,7 @@ describe(":Beads tree folding", function()
   end)
 
   it("keymaps.tree_view.fold = false disables the toggle", function()
-    require("beads").setup({ keymaps = { tree_view = { fold = false } } })
+    require("beads").setup({ tree = { layout = "split" }, keymaps = { tree_view = { fold = false } } })
     local tree = ready_tree()
     local buf = vim.api.nvim_win_get_buf(tree)
     assert.is_nil(buf_map(buf, "<Tab>"), "<Tab> mapped with fold = false")

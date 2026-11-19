@@ -73,7 +73,7 @@ describe("beads global keymaps", function()
     package.preload["fzf-lua"] = function()
       error("fzf-lua is not installed (test)")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     stub_ui()
   end)
 

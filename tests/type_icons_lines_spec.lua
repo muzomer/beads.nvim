@@ -30,11 +30,11 @@ end
 
 describe("type icons in the shared line format", function()
   after_each(function()
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   it("golden: enabled icons appear between the status glyph and the id", function()
-    require("beads").setup({ type_icons = ICONS })
+    require("beads").setup({ tree = { layout = "split" }, type_icons = ICONS })
     local text = F.format(bead("ab-1", "Alpha", "task"))
     assert.are.equal("○ [T] ab-1 P2 Alpha", text)
     local etext = F.format(bead("ab-2", "Big one", "epic", { priority = 1 }))
@@ -42,7 +42,7 @@ describe("type icons in the shared line format", function()
   end)
 
   it("the id range still covers exactly the id when an icon is shown", function()
-    require("beads").setup({ type_icons = ICONS })
+    require("beads").setup({ tree = { layout = "split" }, type_icons = ICONS })
     local text, ranges = F.format(bead("ab-1", "Alpha", "task"))
     local found
     for _, r in ipairs(ranges) do
@@ -54,23 +54,23 @@ describe("type icons in the shared line format", function()
   end)
 
   it("passes already: default (disabled) shows no icon", function()
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     assert.are.equal("○ ab-1 P2 Alpha", (F.format(bead("ab-1", "Alpha", "task"))))
   end)
 
   it("passes already: a type without an icon in the table gets no icon and no extra space", function()
-    require("beads").setup({ type_icons = ICONS })
+    require("beads").setup({ tree = { layout = "split" }, type_icons = ICONS })
     assert.are.equal("○ ab-3 P2 Bug here", (F.format(bead("ab-3", "Bug here", "bug"))))
   end)
 
   it("picker lines show the type icon", function()
-    require("beads").setup({ type_icons = ICONS })
+    require("beads").setup({ tree = { layout = "split" }, type_icons = ICONS })
     local picker = require("beads.views.picker")
     assert.are.equal("○ [T] ab-1 P2 Alpha", picker.format(bead("ab-1", "Alpha", "task")))
   end)
 
   it("passes already: picker lines show no icon by default", function()
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     local picker = require("beads.views.picker")
     assert.are.equal("○ ab-1 P2 Alpha", picker.format(bead("ab-1", "Alpha", "task")))
   end)

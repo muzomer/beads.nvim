@@ -286,7 +286,7 @@ describe("tree group confirm lists the ids in a float for more than 5 beads", fu
     if vim.fn.exists(":Beads") == 0 then
       vim.cmd.source(plugin_root .. "/plugin/beads.lua")
     end
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
     local before = {}
     for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
       before[w] = true
@@ -320,7 +320,7 @@ describe("tree group confirm lists the ids in a float for more than 5 beads", fu
     cli.set_root(nil)
     vim.cmd.cd(vim.fn.fnameescape(plugin_root))
     vim.fn.delete(dir, "rf")
-    require("beads").setup({})
+    require("beads").setup({ tree = { layout = "split" } })
   end)
 
   it("x on 6 marks lists the 6 ids with titles in a float; y closes it and closes the beads", function()
