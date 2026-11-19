@@ -46,7 +46,7 @@ M.defaults = {
   },
   thread = {
     { "reply", { "r", "i" }, "reply" },
-    { "resolve", "x", "resolve thread" },
+    { "resolve", "x", "resolve thread (saves it as a bead comment)" },
     { "apply", "a", "apply the proposal to the bead (unsaved edit)" },
     { "yank_run", "yr", "yank workflow run command (human threads)" },
     { "peek", "gd", "peek the bead id under the cursor (float)" },

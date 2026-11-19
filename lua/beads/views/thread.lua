@@ -26,6 +26,39 @@ local function lines_of(t)
   return out
 end
 
+local function transcript(t)
+  local out = { ("Question thread %s"):format(t.id) }
+  if t.section and t.section ~= "" then
+    out[#out + 1] = "Section: " .. tostring(t.section)
+  end
+  if t.quote and t.quote ~= "" then
+    out[#out + 1] = "Quote: " .. tostring(t.quote)
+  end
+  out[#out + 1] = ""
+  for _, m in ipairs(t.messages or {}) do
+    out[#out + 1] = (m.author == "agent" and "A: " or "Q: ") .. (m.body or "")
+    out[#out + 1] = ""
+  end
+  return table.concat(out, "\n")
+end
+
+-- Saves the resolved thread as ONE bead comment, once. saved_comment is set before the call (so
+-- a second x while it runs adds nothing) and cleared again if bd fails.
+local function save_comment(root, tid)
+  local t = qstore.get(root, tid)
+  if not t or t.saved_comment then
+    return
+  end
+  pcall(qstore.mark_saved, root, tid, true)
+  require("beads.cli").comments_add(t.bead, transcript(t), function(res)
+    if res.err then
+      pcall(qstore.mark_saved, root, tid, false)
+      local why = (vim.split(res.err, "\n", { plain = true })[1] or ""):sub(1, 120)
+      vim.notify("Beads: the thread comment was not saved on the bead (" .. why .. ")", vim.log.levels.WARN)
+    end
+  end)
+end
+
 local function latest_proposal(t)
   for i = #(t.messages or {}), 1, -1 do
     if t.messages[i].proposal then
@@ -220,6 +253,8 @@ function M.open(dbuf, idx)
     local ok, err = pcall(qstore.resolve, root, t.id)
     if not ok then
       fail(tostring(err))
+    else
+      save_comment(root, t.id)
     end
     refresh()
   end

@@ -247,4 +247,18 @@ function M.resolve(root, tid)
   end)
 end
 
+-- Remembers that the thread's transcript was saved as a bead comment.
+function M.mark_saved(root, tid, saved)
+  return with_lock(root, function()
+    local threads = load(root)
+    local t = find(threads, tid)
+    if not t then
+      return nil
+    end
+    t.saved_comment = saved ~= false
+    save(root, threads)
+    return t
+  end)
+end
+
 return M

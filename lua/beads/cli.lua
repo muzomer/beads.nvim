@@ -104,6 +104,11 @@ function M.comment(id, text, cb)
   M.run_with_files({ "comment", id }, { ["--file"] = text }, cb)
 end
 
+-- Adds one comment (full text, passed through a temp file) with `bd comments add`.
+function M.comments_add(id, text, cb)
+  M.run_with_files({ "comments", "add", id }, { ["-f"] = text }, cb)
+end
+
 -- lines: bd batch grammar lines, passed via a temp file.
 function M.batch(lines, cb)
   local path = vim.fn.tempname()

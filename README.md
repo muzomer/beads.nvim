@@ -61,7 +61,7 @@ failed or refused save stays in EDIT). `beads://new` opens in EDIT mode.
 
 ### Thread float
 
-`keymaps.thread.*`: `r` / `i` reply (`reply`), `x` resolve (`resolve`), `a` apply the proposal as an
+`keymaps.thread.*`: `r` / `i` reply (`reply`), `x` resolve (`resolve`; the whole thread is saved once as one bead comment via `bd comments add`, retried on the next `x` if bd failed), `a` apply the proposal as an
 unsaved edit of the detail buffer (`apply`), `n` / `p` next / previous thread (`next`, `prev`), `yr` yank
 the run command of a human thread (`yank_run`), `K` peek the bead id under the cursor (`details`), `?` / `g?` help, `q` / `<Esc>` close (`close`).
 
