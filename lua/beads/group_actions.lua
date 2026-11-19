@@ -153,8 +153,20 @@ function M.new(get_root, on_done)
       for _, id in ipairs(ids) do
         sel[id] = true
       end
-      for _, b in pairs(store.get(v.root).by_id) do
-        if b.type == "epic" and not sel[b.id] then
+      local all = store.get(v.root).by_id
+      local function below_selected(b)
+        local seen, p = {}, b.parent
+        while p and not seen[p] do
+          if sel[p] then
+            return true
+          end
+          seen[p] = true
+          p = all[p] and all[p].parent
+        end
+        return false
+      end
+      for _, b in pairs(all) do
+        if b.type == "epic" and b.status ~= "closed" and not sel[b.id] and not below_selected(b) then
           epics[#epics + 1] = b
         end
       end
@@ -196,7 +208,16 @@ function M.new(get_root, on_done)
         return vim.notify("Beads: the selected beads have no blocking dependencies", vim.log.levels.INFO)
       end
       pick("Remove dependency on: ", ordered_by_id(list), bead_label, function(c)
-        dep_batch(ids, "remove", c.id)
+        local targets = {}
+        for _, b in ipairs(beads_of(ids)) do
+          if vim.tbl_contains(b.blocked_by or {}, c.id) then
+            targets[#targets + 1] = b.id
+          end
+        end
+        if #targets == 0 then
+          return vim.notify("Beads: none of the selected beads depend on " .. c.id, vim.log.levels.INFO)
+        end
+        dep_batch(targets, "remove", c.id)
       end)
     end
   end
