@@ -7,6 +7,7 @@ local M = {}
 
 local NS = vim.api.nvim_create_namespace("beads_tree")
 local MARK_NS = vim.api.nvim_create_namespace("beads_tree_marked")
+local WAIT_NS = vim.api.nvim_create_namespace("beads_tree_waiting")
 local CUR_NS = vim.api.nvim_create_namespace("beads_tree_current")
 local current = {} -- { id, buf } of the most recent beads://<id> detail buffer
 
@@ -386,6 +387,24 @@ local function paint_marks(v)
   end
 end
 
+-- Spinner next to 💬 on the beads whose question waits on the agent (beads.progress).
+local function paint_waiting(v)
+  if not vim.api.nvim_buf_is_valid(v.buf) then
+    return
+  end
+  local progress = require("beads.progress")
+  vim.api.nvim_buf_clear_namespace(v.buf, WAIT_NS, 0, -1)
+  for row, id in pairs(v.ids or {}) do
+    local spin = progress.waiting(v.root, id)
+    if spin and row <= vim.api.nvim_buf_line_count(v.buf) then
+      vim.api.nvim_buf_set_extmark(v.buf, WAIT_NS, row - 1, 0, {
+        virt_text = { { progress.glyph() .. " " .. spin, "BeadsBadgeAgent" } },
+        virt_text_pos = "eol",
+      })
+    end
+  end
+end
+
 local function render(v)
   if not vim.api.nvim_buf_is_valid(v.buf) then
     return
@@ -456,6 +475,15 @@ local function render(v)
   end
   mark_current(v)
   paint_marks(v)
+  paint_waiting(v)
+  require("beads.progress").watch("tree" .. v.buf, {
+    valid = function()
+      return vim.api.nvim_buf_is_valid(v.buf) and vim.fn.bufwinid(v.buf) ~= -1
+    end,
+    update = function()
+      paint_waiting(v)
+    end,
+  })
   if vim.api.nvim_win_is_valid(v.win) then
     apply_layout(v.win, v.pos, v)
   end

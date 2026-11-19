@@ -93,14 +93,25 @@ end
 
 -- Hands a prompt to agent-poke.nvim; without it (or when it fails) the prompt goes to the " register.
 -- note: optional lead-in for the fallback message.
-function M.deliver(root, prompt, note)
+-- ctx: optional { bead, thread, base_n } to follow the poke's progress (see beads.progress).
+function M.deliver(root, prompt, note, ctx)
   local ok, poke = pcall(require, "agent-poke")
   if ok and type(poke) == "table" and poke.poke then
-    local pok, err = pcall(poke.poke, root, prompt, {
+    local pok, err, id = pcall(poke.poke, root, prompt, {
       env = { PATH = M.plugin_bin() .. ":" .. (vim.env.PATH or "") },
       tools = { "Bash(beads-ask:*)", "Bash(bd show:*)" },
     })
     if pok then
+      if ctx and ctx.bead and ctx.thread and (id ~= nil or err == false) then
+        require("beads.progress").add({
+          root = root,
+          bead = ctx.bead,
+          thread = ctx.thread,
+          base_n = ctx.base_n,
+          prompt = prompt,
+          id = id,
+        })
+      end
       return
     end
     vim.notify("Beads: agent-poke failed: " .. (tostring(err):match("[^\n%s][^\n]*") or ""), vim.log.levels.WARN)

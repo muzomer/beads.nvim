@@ -376,7 +376,11 @@ function M.ask(buf)
       end
       if send then
         local lines = vim.api.nvim_buf_is_valid(buf) and (render.render(bead)) or {}
-        workflow.deliver(root, build_prompt(root, bead, thread, lines), "question stored.")
+        workflow.deliver(root, build_prompt(root, bead, thread, lines), "question stored.", {
+          bead = bead.id,
+          thread = thread.id,
+          base_n = #(thread.messages or {}),
+        })
       end
       if not vim.api.nvim_buf_is_valid(buf) then
         return
@@ -683,6 +687,10 @@ function M.winbar(win)
   if st.changed then
     out[#out + 1] = "%#BeadsWinbar#  %#BeadsWinbarChanged#⚠ changed on disk"
   end
+  local spin = b and require("beads.progress").waiting(st.root, b.id)
+  if spin then
+    out[#out + 1] = "%#BeadsWinbar#  " .. require("beads.progress").glyph() .. " " .. spin
+  end
   out[#out + 1] = "%#BeadsWinbar#"
   return table.concat(out)
 end
@@ -690,10 +698,18 @@ end
 local WINBAR_EXPR = "%{%v:lua.require'beads.views.detail'.winbar()%}"
 
 attach_winbar = function(buf)
+  require("beads.progress").watch("detail" .. buf, {
+    valid = function()
+      return vim.api.nvim_buf_is_valid(buf) and state[buf] ~= nil and vim.fn.bufwinid(buf) ~= -1
+    end,
+    update = function()
+      vim.cmd("redrawstatus!")
+    end,
+  })
   for _, w in ipairs(vim.fn.win_findbuf(buf)) do
     vim.api.nvim_set_option_value("winbar", WINBAR_EXPR, { scope = "local", win = w })
   end
-  vim.cmd.redrawstatus()
+  vim.cmd("redrawstatus!")
 end
 
 apply = function(buf, bead)

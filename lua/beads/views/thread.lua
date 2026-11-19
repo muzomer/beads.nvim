@@ -44,19 +44,19 @@ function M.open(dbuf, idx)
   local fbuf = vim.api.nvim_create_buf(false, true)
   vim.bo[fbuf].bufhidden = "wipe"
   vim.bo[fbuf].filetype = "markdown"
-  local width = math.min(80, math.max(30, vim.o.columns - 4))
-  local height = math.min(20, math.max(5, vim.o.lines - 6))
   local win = vim.api.nvim_open_win(fbuf, true, {
     relative = "editor",
-    width = width,
-    height = height,
-    row = math.max(0, math.floor((vim.o.lines - height) / 2)),
-    col = math.max(0, math.floor((vim.o.columns - width) / 2)),
+    width = 60,
+    height = 5,
+    row = 0,
+    col = 0,
     style = "minimal",
     border = "rounded",
     title = " Thread ",
   })
   vim.wo[win].wrap = true
+  vim.wo[win].linebreak = true
+  vim.wo[win].breakindent = true
 
   local function close()
     if vim.api.nvim_win_is_valid(win) then
@@ -74,15 +74,83 @@ function M.open(dbuf, idx)
       end
     end
   end
+  local progress = require("beads.progress")
+  local stage_row -- buffer line (1-based) of the stage line, or nil
+  -- Sizes the float to its content: up to 80% of the editor, centered.
+  local function resize()
+    if not (vim.api.nvim_win_is_valid(win) and vim.api.nvim_buf_is_valid(fbuf)) then
+      return
+    end
+    local maxw = math.max(1, math.min(vim.o.columns - 2, math.max(20, math.floor(vim.o.columns * 0.8))))
+    local maxh = math.max(3, math.floor(vim.o.lines * 0.8))
+    local want = 0
+    for _, l in ipairs(vim.api.nvim_buf_get_lines(fbuf, 0, -1, false)) do
+      want = math.max(want, vim.fn.strdisplaywidth(l))
+    end
+    local width = math.min(maxw, math.max(60, want + 2))
+    if vim.api.nvim_win_get_width(win) ~= width then
+      vim.api.nvim_win_set_config(win, { relative = "editor", width = width, row = 0, col = 0 })
+    end
+    local height = math.min(maxh, math.max(1, vim.api.nvim_win_text_height(win, {}).all))
+    local row = math.max(0, math.floor((vim.o.lines - height - 2) / 2))
+    local col = math.max(0, math.floor((vim.o.columns - width - 2) / 2))
+    vim.api.nvim_win_set_config(win, { relative = "editor", width = width, height = height, row = row, col = col })
+  end
+  local function stage_line()
+    local t = current()
+    local text = t and progress.stage_text(root, t.bead, t.id)
+    return text and ("  " .. text)
+  end
   local function render()
     local t = current()
     if not (t and vim.api.nvim_buf_is_valid(fbuf)) then
       return close()
     end
+    local lines = lines_of(t)
+    local sl = stage_line()
+    stage_row = nil
+    if sl then
+      lines[#lines + 1] = sl
+      stage_row = #lines
+    end
     vim.bo[fbuf].modifiable = true
-    vim.api.nvim_buf_set_lines(fbuf, 0, -1, false, lines_of(t))
+    vim.api.nvim_buf_set_lines(fbuf, 0, -1, false, lines)
     vim.bo[fbuf].modifiable = false
+    resize()
   end
+  -- Redraws only the stage line (spinner frame, stage change).
+  local function update_stage()
+    if not (vim.api.nvim_win_is_valid(win) and vim.api.nvim_buf_is_valid(fbuf)) then
+      return
+    end
+    local sl = stage_line()
+    if (sl ~= nil) ~= (stage_row ~= nil) then
+      return render()
+    end
+    if sl then
+      local cur = vim.api.nvim_buf_get_lines(fbuf, stage_row - 1, stage_row, false)[1]
+      if cur ~= sl then
+        vim.bo[fbuf].modifiable = true
+        vim.api.nvim_buf_set_lines(fbuf, stage_row - 1, stage_row, false, { sl })
+        vim.bo[fbuf].modifiable = false
+            resize()
+      end
+    end
+  end
+  progress.watch("thread" .. fbuf, {
+    valid = function()
+      return vim.api.nvim_win_is_valid(win) and vim.api.nvim_buf_is_valid(fbuf)
+    end,
+    update = update_stage,
+  })
+  vim.api.nvim_create_autocmd("VimResized", {
+    callback = function()
+      if not vim.api.nvim_win_is_valid(win) then
+        return true
+      end
+        resize()
+    end,
+  })
   local function refresh()
     if not vim.api.nvim_buf_is_valid(dbuf) then
       return close()
@@ -113,7 +181,7 @@ function M.open(dbuf, idx)
                 text,
                 t.bead
               )
-              require("beads.workflow").deliver(root, prompt, "answer stored.")
+              require("beads.workflow").deliver(root, prompt, "answer stored.", { bead = t.bead, thread = t.id })
             end
             refresh()
           end)
@@ -130,7 +198,11 @@ function M.open(dbuf, idx)
               text,
               t.id
             )
-            require("beads.workflow").deliver(root, prompt, "reply stored.")
+            require("beads.workflow").deliver(root, prompt, "reply stored.", {
+              bead = t.bead,
+              thread = t.id,
+              base_n = #(t.messages or {}) + 1,
+            })
           end
           refresh()
         end
