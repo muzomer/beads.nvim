@@ -561,18 +561,20 @@ local function setup_keys(v, tab)
     local out, seen = {}, {}
     for r = 1, vim.api.nvim_buf_line_count(v.buf) do
       local id = v.ids[r]
-      if id and v.marked[id] then
+      if id and v.marked[id] and not seen[id] then
         out[#out + 1] = id
         seen[id] = true
       end
     end
-    local rest = {}
+    local hidden = 0
     for id in pairs(v.marked) do
       if not seen[id] then
-        rest[#rest + 1] = id
+        hidden = hidden + 1
       end
     end
-    vim.list_extend(out, vim.fn.sort(rest))
+    if hidden > 0 then
+      vim.notify("Beads: skipped " .. hidden .. " hidden mark" .. (hidden == 1 and "" or "s"))
+    end
     if #out > 0 then
       return out
     end
@@ -625,12 +627,18 @@ local function setup_keys(v, tab)
     act("claim")
   end)
   map("mark", function()
-    local row = vim.api.nvim_win_get_cursor(0)[1]
-    for r = row, math.min(row + vim.v.count1 - 1, vim.api.nvim_buf_line_count(v.buf)) do
+    local r = vim.api.nvim_win_get_cursor(0)[1]
+    local last = vim.api.nvim_buf_line_count(v.buf)
+    for _ = 1, vim.v.count1 do
+      if r > last then
+        break
+      end
       local id = v.ids[r]
       if id then
         v.marked[id] = (not v.marked[id]) or nil
       end
+      local fe = vim.fn.foldclosedend(r)
+      r = (fe > r and fe or r) + 1
     end
     paint_marks(v)
   end)
