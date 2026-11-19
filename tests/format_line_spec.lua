@@ -3,9 +3,8 @@
 --   local F = require("beads.ui.format")
 --   local text, ranges = F.format(bead, opts)
 --     bead: a normalized bead (beads.model.normalize)
---     text: "<status glyph> <id padded> <P#> <title> <badges>"
+--     text: "<status glyph> <id> <P#> <title> <badges>"
 --     ranges: list of { group = "Beads...", col = <0-based byte>, end_col = <exclusive byte> }
---     opts.id_width: pad the id to this display width (padding is not part of the id range)
 --   F.sort(list) -> list sorted in place: priority ascending (nil last), ties by id
 -- assumption: range shape { group, col, end_col } in bytes (maps onto nvim_buf_set_extmark).
 -- assumption: badges that need the user (👤 human, 💬 waiting, 👀 needs-review) use
@@ -179,18 +178,6 @@ describe("beads.ui.format", function()
       assert.is_true(r.group:match("^Beads") ~= nil, "non-Beads group\n" .. dump(text, ranges))
     end
     assert.is_not_nil(range_for(text, ranges, "BeadsTitle", "Ünïcode title ✓"), dump(text, ranges))
-  end)
-
-  it("opts.id_width pads the id so the following columns line up", function()
-    local short_text, short_ranges = F.format(bead("ab-1", "Short"), { id_width = 10 })
-    local long_text, long_ranges = F.format(bead("abcdef-123", "Long"), { id_width = 10 })
-    local ps = range_for(short_text, short_ranges, "BeadsPriority2", "P2")
-    local pl = range_for(long_text, long_ranges, "BeadsPriority2", "P2")
-    assert.is_not_nil(ps, dump(short_text, short_ranges))
-    assert.is_not_nil(pl, dump(long_text, long_ranges))
-    assert.are.equal(pl.col, ps.col, "P# not aligned:\n" .. short_text .. "\n" .. long_text)
-    assert.is_not_nil(range_for(short_text, short_ranges, "BeadsId", "ab-1"), "id range must exclude padding\n"
-      .. dump(short_text, short_ranges))
   end)
 
   it("sort orders by priority, then id, with no priority last", function()

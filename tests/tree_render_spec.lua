@@ -419,7 +419,7 @@ describe("tree rendering", function()
     local name = vim.fn.fnamemodify(root, ":t")
     local tree = open_tree()
     assert.is_not_nil(tree, ":Beads tree opened no window")
-    local want = "beads · " .. name .. " · 4 open · 3 ready · 1 need you"
+    local want = "beads · " .. name .. " · 4 open · 3 ready · 1 need you (0💬 1👤)"
     local function header_is(w)
       return vim.wait(3000, function()
         if not vim.api.nvim_win_is_valid(tree) then
@@ -452,7 +452,7 @@ describe("tree rendering", function()
       bead("hd-g", "Golf", { labels = { "human" } }),
     })
     store.refresh(root)
-    local want2 = "beads · " .. name .. " · 5 open · 4 ready · 2 need you"
+    local want2 = "beads · " .. name .. " · 5 open · 4 ready · 2 need you (0💬 2👤)"
     assert(header_is(want2), "header did not update to '" .. want2 .. "':\n" .. dump(tree))
   end)
 

@@ -719,14 +719,10 @@ function M.decorate(buf, bead, lines, regions)
   relative_times(buf, bead, regions)
 end
 
--- Fetches the current server version of the bead; cb(bead|nil, err).
-function M.fetch(buf, cb)
-  if not vim.api.nvim_buf_is_valid(buf) then
-    return
-  end
-  local id = bead_id(buf)
+-- Fetches bead `id` (with comments) from bd in `root`; cb(bead|nil, err).
+function M.fetch_bead(root, id, cb)
   local prev = cli.get_root_override()
-  cli.set_root(M.root(buf))
+  cli.set_root(root)
   cli.show(id, function(res)
     if res.err then
       return cb(nil, res.err)
@@ -738,6 +734,14 @@ function M.fetch(buf, cb)
     cb(model.normalize(item))
   end, { include_comments = true })
   cli.set_root(prev)
+end
+
+-- Fetches the current server version of the bead; cb(bead|nil, err).
+function M.fetch(buf, cb)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  M.fetch_bead(M.root(buf), bead_id(buf), cb)
 end
 
 -- Opens a split with the server rendering of the bead and diffs it against the detail buffer.

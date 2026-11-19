@@ -1,6 +1,5 @@
 -- gd peek: stacked, read-only floating detail views of the bead id under the cursor.
 local cli = require("beads.cli")
-local model = require("beads.model")
 local render = require("beads.buffer.render")
 local workflow = require("beads.workflow")
 local keys = require("beads.keys")
@@ -65,17 +64,10 @@ local function paint(e, bead)
 end
 
 local function fetch(e)
-  local prev = cli.get_root_override()
-  cli.set_root(e.root)
-  cli.show(e.id, function(res)
-    if res.err or not vim.api.nvim_buf_is_valid(e.buf) then
+  require("beads.views.detail").fetch_bead(e.root, e.id, function(bead)
+    if not bead or not vim.api.nvim_buf_is_valid(e.buf) then
       return
     end
-    local item = type(res.data) == "table" and (res.data[1] or res.data) or nil
-    if not item or not item.id then
-      return
-    end
-    local bead = model.normalize(item)
     require("beads.views.detail").gather(e.root, bead.id, function(threads)
       if not vim.api.nvim_buf_is_valid(e.buf) then
         return
@@ -83,8 +75,7 @@ local function fetch(e)
       bead.threads = threads
       paint(e, bead)
     end)
-  end, { include_comments = true })
-  cli.set_root(prev)
+  end)
 end
 
 local function top()

@@ -1,8 +1,7 @@
 -- Shared bead line formatter used by the tree view and the pickers.
 --   format(bead, opts) -> text, ranges
---   text:   "<status glyph> <id> <P#> <title> <badges> [⛔ blocked by <id>...]"
+--   text:   "<status glyph> [<type icon>] <id> <P#> <title> <badges> [⛔ blocked by <id>...]"
 --   ranges: { group, col, end_col } 0-based byte offsets, end exclusive (extmark friendly)
---   opts.id_width: pad the id to this display width (padding is outside the id range)
 --   opts.blockers: list of ids appended as "⛔ blocked by <id>" markers
 local glyphs = require("beads.glyphs")
 local workflow = require("beads.workflow")
@@ -44,13 +43,12 @@ function M.format(b, opts)
   end
   local sg = glyphs.status(b.status)
   add(sg ~= "" and sg or "·", STATUS_GROUPS[b.status] or "BeadsDim")
+  local icon = glyphs.type(b.type)
+  if icon ~= "" then
+    add(icon, "BeadsDim")
+  end
   local id = b.id or ""
   add(id, "BeadsId")
-  local pad = (opts.id_width or 0) - vim.fn.strdisplaywidth(id)
-  if pad > 0 then
-    parts[#parts + 1] = string.rep(" ", pad)
-    len = len + pad
-  end
   local p = b.priority
   add("P" .. tostring(p or "?"), (type(p) == "number" and p >= 0 and p <= 4) and ("BeadsPriority" .. p) or "BeadsDim")
   add(b.title or "", "BeadsTitle")

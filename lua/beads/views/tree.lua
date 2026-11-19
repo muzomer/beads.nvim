@@ -184,17 +184,25 @@ function M.order(root)
 end
 
 local function header_text(v, st)
-  local open, need = 0, 0
+  local open, chat, human = 0, 0, 0
   for _, b in pairs(st.by_id) do
     if b.status == "open" then
       open = open + 1
     end
-    if b.status ~= "closed" and (b.waiting_user or require("beads.workflow").is_needs_me(b)) then
-      need = need + 1
+    if b.status ~= "closed" then
+      if b.waiting_user then
+        chat = chat + 1
+      elseif vim.tbl_contains(b.labels or {}, "human") then
+        human = human + 1
+      end
     end
   end
   local name = vim.fn.fnamemodify((v.root:gsub("/+$", "")), ":t")
+  local need = chat + human
   local head = ("beads · %s · %d open · %d ready · %d need you"):format(name, open, store.get(v.root).ready_n or 0, need)
+  if need > 0 then
+    head = head .. (" (%d💬 %d👤)"):format(chat, human)
+  end
   if v.filter and v.filter ~= "" then
     head = head .. " · filter: " .. v.filter
   end

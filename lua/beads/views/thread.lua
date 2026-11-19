@@ -173,7 +173,7 @@ function M.open(dbuf, idx)
     local t = current()
     local b = detail.snapshot(dbuf)
     if t and t.human and b then
-      vim.fn.setreg('"', workflow.run_command(b))
+      workflow.yank(workflow.run_command(b))
     end
   end
   acts.peek = function()
