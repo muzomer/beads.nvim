@@ -2,8 +2,52 @@
 
 Neovim front end for the [beads](https://github.com/steveyegge/beads) issue tracker (`bd`).
 Commands: `:Beads tree [left|right|bottom|top]|ready|list|search|needs|epics|questions|show <id>|create|cd <path>|poke [pick]|output|chat`.
-`poke`, `output` and `chat` pass through to [agent-poke.nvim](https://github.com/momer/agent-poke.nvim)
+`poke`, `output` and `chat` pass through to [agent-poke.nvim](https://github.com/muzomer/agent-poke.nvim)
 (a hint is shown when it is not installed); `poke` resends the threads waiting on the agent, `poke pick` chooses a target.
+
+## Requirements and install
+
+- Neovim 0.10+ and the `bd` CLI (1.2.2 or newer; `:checkhealth beads` checks both).
+- Optional: [fzf-lua](https://github.com/ibhagwan/fzf-lua) (pickers; the plugin falls back to `vim.ui.select`),
+  [agent-poke.nvim](https://github.com/muzomer/agent-poke.nvim) (sends questions to an agent),
+  [render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim) (see the end).
+
+lazy.nvim:
+
+```lua
+{
+  "muzomer/beads.nvim",
+  config = function()
+    require("beads").setup({})
+  end,
+}
+```
+
+vim.pack (Neovim 0.12+):
+
+```lua
+vim.pack.add({ "https://github.com/muzomer/beads.nvim" })
+require("beads").setup({})
+```
+
+## Options
+
+These are the defaults; pass only what you want to change.
+
+```lua
+require("beads").setup({
+  tree = { layout = "full", position = "left", width = "auto", height = "auto" }, -- also max_width, max_height
+  keymaps = {},          -- every key can be changed, given a list, or set to false (see Keymaps)
+  mouse = true,          -- tree: click selects, opens and folds; false installs no mouse maps
+  fzf = "auto",          -- fzf-lua pickers when installed; false uses vim.ui.select
+  glyphs = {},           -- status glyph overrides, or "ascii"
+  type_icons = false,    -- or { epic = "E", bug = "B", ... }
+  flash_ms = 350,        -- jump flash duration; false disables
+  notify = true,         -- false silences the "changed externally" notes
+  notify_group_ms = 1500, -- external changes inside this window are one note
+  ask = { open_after_send = true }, -- open the new thread's float after sending a question
+})
+```
 
 ## Keymaps
 
@@ -67,7 +111,28 @@ the run command of a human thread (`yank_run`), `K` peek the bead id under the c
 
 ### Peek floats (`gd`)
 
-`gd` on a bead id (detail VIEW, tree, thread float) opens that bead in a floating, read-only detail view with the same rendering and highlighting; it follows live updates (the watcher is held while any peek float is open). Floats stack, offset down and right; `gd` on a bead already open focuses it. `keymaps.detail.view.peek`, `keymaps.tree_view.peek` and `keymaps.thread.peek` set the `gd` key (`false` disables). A float has the detail view's keys and they act on the float's bead: `e` / `i` open it in the main window in EDIT mode and close the floats (`edit`), `x` close (`close_bead`), `C` claim (`claim`), `n` note (`note`), `c` comment (`comment`), `a` ask (`ask`), `<CR>` on a question line opens its thread (`open_thread`), `]u` / `[u` jump between threads waiting for you (`next_waiting`, `prev_waiting`), `]b` / `[b` replace the float's bead in place with the next / previous bead in tree order (`next_bead`, `prev_bead`; a count works), `K` / `gd` peek the bead id under the cursor (`details`, `peek`), `yy` (`yank_id`), `yr` (`yank_run`), `?` / `g?` help (`help`). Keys come from `keymaps.detail.view.*`; `keymaps.peek.*` (same action names) overrides them for floats. Float-only keys: `q` / `<Esc>` close the top float (`close`), `Q` close all (`close_all`), `<CR>` elsewhere opens the bead in the main window and closes all (`open`). Actions that change the bead refresh the float.
+`gd` on a bead id (detail VIEW, tree, thread float) opens that bead in a floating, read-only detail view with the
+same rendering and highlighting. It follows live updates (the watcher is held while any peek float is open). Floats
+stack, offset down and right; `gd` on a bead already open focuses it. `keymaps.detail.view.peek`,
+`keymaps.tree_view.peek` and `keymaps.thread.peek` set the `gd` key (`false` disables).
+
+A float has the detail view's keys, and they act on the float's bead. The keys come from `keymaps.detail.view.*`;
+`keymaps.peek.*` (same action names) overrides them for floats. Actions that change the bead refresh the float.
+
+| key | config | action in a float |
+|---|---|---|
+| `e`, `i` | `edit` | open the bead in the main window in EDIT mode and close the floats |
+| `x` | `close_bead` | close the bead |
+| `C` | `claim` | claim |
+| `n`, `c`, `a` | `note`, `comment`, `ask` | note, comment, ask |
+| `<CR>` | `open_thread` | on a question line, open its thread; elsewhere open the bead in the main window and close all floats (`open`) |
+| `]u`, `[u` | `next_waiting`, `prev_waiting` | jump between threads waiting for you |
+| `]b`, `[b` | `next_bead`, `prev_bead` | replace the float's bead with the next / previous in tree order (a count works) |
+| `K`, `gd` | `details`, `peek` | peek the bead id under the cursor |
+| `yy`, `yr` | `yank_id`, `yank_run` | yank the id / run command |
+| `?`, `g?` | `help` | help float |
+| `q`, `<Esc>` | `close` | close the top float (float only) |
+| `Q` | `close_all` | close all floats (float only) |
 
 ### Tree
 
@@ -75,9 +140,52 @@ the run command of a human thread (`yank_run`), `K` peek the bead id under the c
 
 `tree.width` (left/right) and `tree.height` (bottom/top) default to `"auto"`: the tree fits its longest visible line (at least 24 columns) or its visible row count (at least 6), refitting after every render and on `VimResized`. `tree.max_width` (default half the columns) and `tree.max_height` (default 40% of the lines) cap the auto size. A number keeps a fixed size. Resizing the tree window by hand stops auto-fit until the tree is reopened.
 
-`keymaps.tree_view.*`: `<CR>` open, `a` add child, `x` close, `C` claim, `R` refresh, `H` toggle closed, `L` cycle the layout (left, bottom, right, top), `f` filter (free text plus `status:`, `label:`, `assignee:`, `type:` tokens; empty clears), `s` cycle the sort (priority, updated, id),
-`gd` peek, `K` bead details for the cursor row in a peek float (`details`; `false` disables), `yy` yank id, `yr` yank run command, `q` close, `?` / `g?` help, `za`/`zo`/`zc` fold.
-Selection: `m` toggles a mark and moves the cursor down to the next bead (`▍`, `BeadsMarked`; `3m` marks three beads, `mark`), `M` clears all marks (`clear_marks`), `A` opens the action menu (`actions`): close, claim, reopen, yank ids, yank run commands, set priority, set status, set assignee, set type, add label, remove label, move under epic, remove parent, blocked by, remove dependency. `x`, `C`, `yy` and `yr` act on the marked beads, else on the visual line range (`x`, `C`, `yy`, `yr`, `A`; yanks put one id or run command per line), else on the cursor bead. More than one bead asks `Close 3 beads? [y/N]`; closing runs one `bd batch`, reopening one `bd reopen`. Marks are kept by bead id across refresh, folds, filters and layout moves; failed beads stay marked and one `Beads: n of m failed: <ids>` note is shown.
+`keymaps.tree_view.*`:
+
+| key | config | action |
+|---|---|---|
+| `<CR>` | `open` | open the bead |
+| `a` | | add a child |
+| `x`, `C` | | close, claim |
+| `R` | | refresh |
+| `H` | | toggle closed beads |
+| `L` | | cycle the layout (left, bottom, right, top) |
+| `f` | | filter: free text plus `status:`, `label:`, `assignee:`, `type:` tokens; empty clears |
+| `s` | | cycle the sort (priority, updated, id) |
+| `gd`, `K` | `peek`, `details` | peek float for the cursor row (`K` `false` disables) |
+| `yy`, `yr` | | yank id, yank run command |
+| `za`, `zo`, `zc` | | fold |
+| `q` | | close |
+| `?`, `g?` | | help |
+
+The header counts what needs you, for example `3 need you (2💬 1👤)`: beads with a question waiting on you and beads
+that need a human.
+
+Selection: `m` toggles a mark (`▍`, `BeadsMarked`, `mark`) and moves the cursor down to the next bead; `3m` marks
+three beads and steps over closed folds. `M` clears all marks (`clear_marks`). `A` opens the action menu
+(`actions`): close, claim, reopen, yank ids, yank run commands, set priority, set status, set assignee, set type,
+add label, remove label, move under epic, remove parent, blocked by, remove dependency.
+
+`x`, `C`, `yy` and `yr` act on the marked beads, else on the visual line range, else on the cursor bead (yanks put
+one id or run command per line). More than one bead asks `Close 3 beads? [y/N]`; closing runs one `bd batch`,
+reopening one `bd reopen`. Marks are kept by bead id across refresh, folds, filters and layout moves. A mark hidden
+by a filter or by `H` is skipped, with one `Beads: skipped n hidden marks` note. Failed beads stay marked and one
+`Beads: n of m failed: <ids>` note is shown.
+
+### Asking an agent
+
+`a` on a section of a bead (or on a visual selection) stores a question as a thread in
+`<project root>/.beads-nvim/questions.json`. That file is local to your machine and gitignored; unresolved threads
+are never written to the bead. `<M-s>` in the ask box saves and sends the question to the agent through
+[agent-poke.nvim](https://github.com/muzomer/agent-poke.nvim); without agent-poke (or when it fails) the prompt is
+copied to the `"` register for you to paste.
+
+The agent answers with the `beads-ask` command (`beads-ask reply <thread> <body>`, in the plugin's `bin/`).
+`setup()` puts that directory on nvim's PATH, and every question tells the agent how to call it, so you do not
+configure anything. The reply appears live in the thread float, the Questions section and the badges.
+
+Resolving a thread with `x` saves it once to the bead as one comment (the thread id, its section and every
+message, in order) with `bd comments add`, so the answers sync with the bead and other tools can read them.
 
 ### Input floats (ask, reply, note, comment)
 
@@ -113,6 +221,9 @@ The plugin's `bin/` is only added to nvim's own PATH, so put `nbd` on your shell
 ```sh
 ln -s <plugin>/bin/nbd ~/.local/bin/nbd
 ```
+
+`<plugin>` is where your plugin manager put beads.nvim, for example
+`~/.local/share/nvim/site/pack/core/opt/beads.nvim` (vim.pack) or `~/.local/share/nvim/lazy/beads.nvim` (lazy.nvim).
 
 Quit behaviour: `q` in the tree closes it and nvim quits with it. A detail buffer with unsaved edits
 makes the quit fail, so nvim stays open and nothing is lost. `NBD_NVIM` overrides the nvim command.

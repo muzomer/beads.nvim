@@ -27,7 +27,7 @@ function M.agent(sub, arg)
   local ok, ap = pcall(require, "agent-poke")
   if not ok or type(ap) ~= "table" then
     vim.notify(
-      "Beads: " .. sub .. ": agent-poke.nvim is not installed (https://github.com/momer/agent-poke.nvim)",
+      "Beads: " .. sub .. ": agent-poke.nvim is not installed (https://github.com/muzomer/agent-poke.nvim)",
       vim.log.levels.WARN
     )
     return
