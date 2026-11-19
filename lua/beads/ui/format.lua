@@ -27,10 +27,50 @@ local function user_badges()
   return set
 end
 
+-- Widest display width (min 1) over a list of glyph strings.
+local function max_width(list)
+  local w = 1
+  for _, g in ipairs(list) do
+    w = math.max(w, vim.fn.strdisplaywidth(g))
+  end
+  return w
+end
+
+local function status_width()
+  local list = {}
+  local seen = {}
+  for k in pairs(STATUS_GROUPS) do
+    seen[k] = true
+  end
+  local g = require("beads").config.glyphs
+  if type(g) == "table" then
+    for k in pairs(g) do
+      seen[k] = true
+    end
+  end
+  for k in pairs(seen) do
+    list[#list + 1] = glyphs.status(k)
+  end
+  return max_width(list)
+end
+
+local function type_width()
+  local t = require("beads").config.type_icons
+  local list = {}
+  if type(t) == "table" then
+    for _, v in pairs(t) do
+      if type(v) == "string" then
+        list[#list + 1] = v
+      end
+    end
+  end
+  return max_width(list)
+end
+
 function M.format(b, opts)
   opts = opts or {}
   local parts, ranges, len = {}, {}, 0
-  local function add(s, group)
+  local function add(s, group, width)
     if #parts > 0 then
       parts[#parts + 1] = " "
       len = len + 1
@@ -40,12 +80,18 @@ function M.format(b, opts)
       ranges[#ranges + 1] = { group = group, col = len, end_col = len + #s }
     end
     len = len + #s
+    -- pad to a fixed display width (after the range, so highlights cover the glyph only)
+    local pad = width and (width - vim.fn.strdisplaywidth(s)) or 0
+    if pad > 0 then
+      parts[#parts + 1] = string.rep(" ", pad)
+      len = len + pad
+    end
   end
   local sg = glyphs.status(b.status)
-  add(sg ~= "" and sg or "·", STATUS_GROUPS[b.status] or "BeadsDim")
+  add(sg ~= "" and sg or "·", STATUS_GROUPS[b.status] or "BeadsDim", status_width())
   local icon = glyphs.type(b.type)
   if icon ~= "" then
-    add(icon, "BeadsDim")
+    add(icon, "BeadsDim", type_width())
   end
   local id = b.id or ""
   add(id, "BeadsId")

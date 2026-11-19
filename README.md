@@ -140,6 +140,8 @@ re-applied on `ColorScheme`; override any with `:hi` or `:hi! link`.
 `glyphs` sets the status glyphs (defaults `○ ◐ ● ✓ ❄` for open, in_progress, blocked, closed, deferred):
 `setup({ glyphs = { open = "O" } })` overrides single ones; `setup({ glyphs = "ascii" })` uses plain ASCII
 `o ~ x v z`. `type_icons = { epic = "E", bug = "B", ... }` enables optional type icons (off by default).
+Glyph and icon widths are padded automatically to the widest configured one, so ids stay aligned
+even when a glyph is 2 cells wide.
 
 ## Symbols
 
