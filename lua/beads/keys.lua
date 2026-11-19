@@ -9,7 +9,7 @@ M.defaults = {
     { "add_child", "a", "add child bead" },
     { "close_bead", "x", "close bead(s): marks, visual range or cursor (prompts for a reason)" },
     { "claim", "C", "claim bead(s)" },
-    { "mark", "m", "toggle a mark on the bead (count ok)" },
+    { "mark", "m", "toggle a mark on the bead and move down (count ok)" },
     { "clear_marks", "M", "clear all marks" },
     { "actions", "A", "action menu for the marked / selected beads" },
     { "refresh", "R", "refresh" },

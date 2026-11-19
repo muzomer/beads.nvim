@@ -768,19 +768,32 @@ local function setup_keys(v, tab)
     act("claim")
   end)
   map("mark", function()
-    local r = vim.api.nvim_win_get_cursor(0)[1]
-    local last = vim.api.nvim_buf_line_count(v.buf)
-    for _ = 1, vim.v.count1 do
-      if r > last then
-        break
-      end
-      local id = v.ids[r]
-      if id then
-        v.marked[id] = (not v.marked[id]) or nil
-      end
-      local fe = vim.fn.foldclosedend(r)
-      r = (fe > r and fe or r) + 1
+    if not vim.api.nvim_win_is_valid(v.win) then
+      return
     end
+    local start = vim.api.nvim_win_get_cursor(v.win)[1]
+    local last = vim.api.nvim_buf_line_count(v.buf)
+    local r, lastrow = start, start
+    vim.api.nvim_win_call(v.win, function()
+      for _ = 1, vim.v.count1 do
+        if r > last then
+          break
+        end
+        local id = v.ids[r]
+        if id then
+          v.marked[id] = (not v.marked[id]) or nil
+        end
+        lastrow = r
+        local fe = vim.fn.foldclosedend(r)
+        r = (fe > r and fe or r) + 1
+      end
+      -- Move down to the row after the last processed bead; stay on the last bead row at the end.
+      local dest = lastrow
+      if r <= last and v.ids[r] then
+        dest = r
+      end
+      vim.api.nvim_win_set_cursor(0, { dest, 0 })
+    end)
     paint_marks(v)
   end)
   map("clear_marks", function()
