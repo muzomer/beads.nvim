@@ -86,12 +86,20 @@ function M.yank(text)
   vim.notify("Beads: yanked " .. text, vim.log.levels.INFO)
 end
 
+-- The plugin's bin/ directory (holds beads-ask).
+function M.plugin_bin()
+  return vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h:h") .. "/bin"
+end
+
 -- Hands a prompt to agent-poke.nvim; without it (or when it fails) the prompt goes to the " register.
 -- note: optional lead-in for the fallback message.
 function M.deliver(root, prompt, note)
   local ok, poke = pcall(require, "agent-poke")
   if ok and type(poke) == "table" and poke.poke then
-    local pok, err = pcall(poke.poke, root, prompt)
+    local pok, err = pcall(poke.poke, root, prompt, {
+      env = { PATH = M.plugin_bin() .. ":" .. (vim.env.PATH or "") },
+      tools = { "Bash(beads-ask:*)", "Bash(bd show:*)" },
+    })
     if pok then
       return
     end
