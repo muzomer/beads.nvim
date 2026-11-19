@@ -77,3 +77,13 @@ _Add a brief overview of your project architecture_
 ## Conventions & Patterns
 
 _Add your project-specific conventions here_
+
+## Review checklist
+
+Implementers follow these and reviewers check them.
+
+- Every timer or autocmd callback checks that its window and buffer are still valid.
+- Every wait or retry loop gives up with an error once its timeout passes.
+- An entry waiting for a correlating event expires when that event may never come.
+- On a window the plugin does not own, set options with local scope (never `vim.wo[win].x`, which acts like `:set`) and leave global values unchanged.
+- Detect a buffer the plugin reused by the change the plugin made to it (for example a `beads://` name it lacked before the plugin acted), not by a difference from a snapshot the user can also change.
