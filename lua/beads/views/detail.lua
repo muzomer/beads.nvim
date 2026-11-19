@@ -397,29 +397,35 @@ function M.ask(buf)
         vim.notify("Beads: could not store the question: " .. tostring(thread), vim.log.levels.ERROR)
         return
       end
+      local function refresh_and_open()
+        if not vim.api.nvim_buf_is_valid(buf) then
+          return
+        end
+        M.refresh_threads(buf, function()
+          local cfg = require("beads").config.ask or {}
+          if cfg.open_after_send == false then
+            return
+          end
+          local cur = state[buf]
+          for i, t in ipairs(cur and cur.bead and cur.bead.threads or {}) do
+            if t.id == thread.id then
+              return require("beads.views.thread").open(buf, i)
+            end
+          end
+        end)
+      end
       if send then
         local lines = vim.api.nvim_buf_is_valid(buf) and (render.render(bead)) or {}
+        -- the float opens once delivery has no agent picker open (chosen or cancelled)
         workflow.deliver(root, build_prompt(root, bead, thread, lines), "question stored.", {
           bead = bead.id,
           thread = thread.id,
           base_n = #(thread.messages or {}),
+          on_settled = refresh_and_open,
         })
+      else
+        refresh_and_open()
       end
-      if not vim.api.nvim_buf_is_valid(buf) then
-        return
-      end
-      M.refresh_threads(buf, function()
-        local cfg = require("beads").config.ask or {}
-        if cfg.open_after_send == false then
-          return
-        end
-        local cur = state[buf]
-        for i, t in ipairs(cur and cur.bead and cur.bead.threads or {}) do
-          if t.id == thread.id then
-            return require("beads.views.thread").open(buf, i)
-          end
-        end
-      end)
     end,
   })
 end
