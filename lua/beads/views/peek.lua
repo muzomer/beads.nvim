@@ -247,6 +247,11 @@ local function open(id, root)
   fetch(e)
 end
 
+-- Peeks a given bead id (K in the tree).
+function M.open(id, root)
+  open(id, root or cli.get_root())
+end
+
 -- gd: peeks the bead id under the cursor, or runs Vim's own gd.
 function M.at_cursor(root)
   root = root or cli.get_root()

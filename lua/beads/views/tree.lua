@@ -690,6 +690,12 @@ local function setup_keys(v, tab)
   map("peek", function()
     require("beads.views.peek").at_cursor(v.root)
   end)
+  map("details", function()
+    local id = cur()
+    if id then
+      require("beads.views.peek").open(id, v.root)
+    end
+  end)
   map("layout", function()
     M.cycle(tab)
   end)

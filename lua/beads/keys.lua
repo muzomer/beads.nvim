@@ -19,6 +19,7 @@ M.defaults = {
     { "sort", "s", "cycle sort: priority, updated, id" },
     { "layout", "L", "cycle layout: left, bottom, right, top" },
     { "peek", "gd", "peek the bead id under the cursor (float)" },
+    { "details", "K", "bead details (peek float) for the cursor row" },
     { "yank_id", "yy", "yank bead id(s)" },
     { "yank_run", "yr", "yank workflow run command(s)" },
     { "close", "q", "close tree" },
