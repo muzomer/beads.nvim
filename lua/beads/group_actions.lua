@@ -50,9 +50,9 @@ function M.new(get_root, on_done)
   end
   -- Group field / label / parent / dependency actions: the value is asked once, then the
   -- confirmation, then one bd batch or one bd update per bead.
-  local function quote_val(s)
+  local function quote_if_needed(s)
     if s:find('[%s"]') then
-      return '"' .. s:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"'
+      return require("beads.group").quote(s)
     end
     return s
   end
@@ -85,7 +85,7 @@ function M.new(get_root, on_done)
   local function field_batch(ids, key, value)
     local lines = {}
     for _, id in ipairs(ids) do
-      lines[#lines + 1] = ("update %s %s=%s"):format(id, key, quote_val(value))
+      lines[#lines + 1] = ("update %s %s=%s"):format(id, key, quote_if_needed(value))
     end
     confirm("Set " .. key .. " on", ids, function()
       group_run("batch", ids, { lines = lines })

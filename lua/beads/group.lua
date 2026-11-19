@@ -13,11 +13,11 @@ local function with_root(root, fn)
   cli.set_root(prev)
 end
 
-local function quote(s)
+function M.quote(s)
   return '"' .. s:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"'
 end
 
--- Past participle shown in confirmations.
+-- Imperative verb shown in confirmations.
 local VERB = { close = "Close", claim = "Claim", reopen = "Reopen" }
 
 -- Sorts a list of beads by id, in place.
@@ -104,7 +104,7 @@ function M.run(root, op, ids, opts, done)
     local lines = {}
     for _, id in ipairs(ids) do
       local reason = opts.reason
-      lines[#lines + 1] = "close " .. id .. ((reason and reason ~= "") and (" " .. quote(reason)) or "")
+      lines[#lines + 1] = "close " .. id .. ((reason and reason ~= "") and (" " .. M.quote(reason)) or "")
     end
     return with_root(root, function()
       cli.batch(lines, all_failed)

@@ -1,7 +1,6 @@
 -- Tree view (:Beads tree): left vsplit, one per tabpage, parent-child nesting.
 local cli = require("beads.cli")
 local store = require("beads.store")
-local workflow = require("beads.workflow")
 local keys = require("beads.keys")
 
 local M = {}
@@ -535,12 +534,6 @@ local function setup_keys(v, tab)
         fn(id)
       end
     end
-  end
-  local function in_root(fn)
-    local prev = cli.get_root_override()
-    cli.set_root(v.root)
-    fn()
-    cli.set_root(prev)
   end
   local function row_ids(first, last)
     local out = {}
